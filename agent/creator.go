@@ -1,0 +1,158 @@
+package agent
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/tmc/langchaingo/agents"
+	"github.com/tmc/langchaingo/llms/openai"
+	"github.com/tmc/langchaingo/tools"
+	"github.com/tmc/langchaingo/tools/wikipedia"
+	jarvisTools "jarvis/agent/tools"
+)
+
+// JarvisAgent represents a Jarvis AI agent instance
+type JarvisAgent struct {
+	executor *agents.Executor
+	userID   string
+}
+
+// AgentConfig holds configuration for creating an agent
+type AgentConfig struct {
+	UserID      string
+	OpenAIModel string
+	OpenAIKey   string
+}
+
+// NewJarvisAgent creates a new Jarvis agent instance
+func NewJarvisAgent(config AgentConfig) (*JarvisAgent, error) {
+	// Initialize OpenAI LLM
+	model := config.OpenAIModel
+	if model == "" {
+		model = "gpt-4o-mini"
+	}
+
+	var llm *openai.LLM
+	var err error
+
+	if config.OpenAIKey != "" {
+		llm, err = openai.New(
+			openai.WithModel(model),
+			openai.WithToken(config.OpenAIKey),
+		)
+	} else {
+		llm, err = openai.New(openai.WithModel(model))
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize OpenAI: %v", err)
+	}
+
+	// Initialize Wikipedia tool with proper user agent
+	wikipediaTool := wikipedia.New("Jarvis-AI-Agent/1.0 (https://github.com/user/jarvis)")
+
+	// Get web tools (includes wrapped scraper)
+	webTools, err := jarvisTools.GetWebTools()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create web tools: %v", err)
+	}
+
+	var allTools []tools.Tool
+
+	// Add custom tools
+	allTools = append(allTools, jarvisTools.GetFileTools()...)
+	allTools = append(allTools, jarvisTools.GetExecutionTools()...)
+	allTools = append(allTools, jarvisTools.GetEnvironmentTools()...)
+	allTools = append(allTools, jarvisTools.GetCommunicationTools()...)
+
+	// Add web tools
+	allTools = append(allTools, webTools...)
+
+	// Add external langchain tools
+	allTools = append(allTools, wikipediaTool)
+
+	// Create OpenAI Functions agent
+	agent := agents.NewOpenAIFunctionsAgent(llm, allTools)
+	executor := agents.NewExecutor(agent)
+
+	return &JarvisAgent{
+		executor: executor,
+		userID:   config.UserID,
+	}, nil
+}
+
+// ProcessMessage processes a message and returns the agent's response
+func (ja *JarvisAgent) ProcessMessage(ctx context.Context, message string) (string, error) {
+	if message == "" {
+		return "", fmt.Errorf("message cannot be empty")
+	}
+
+	// Process message with agent
+	result, err := ja.executor.Call(ctx, map[string]any{
+		"input": message,
+	})
+	if err != nil {
+		return "", fmt.Errorf("agent processing error: %v", err)
+	}
+
+	// Extract response
+	if output, ok := result["output"]; ok {
+		return fmt.Sprintf("%v", output), nil
+	}
+
+	return fmt.Sprintf("%v", result), nil
+}
+
+// GetUserID returns the user ID associated with this agent
+func (ja *JarvisAgent) GetUserID() string {
+	return ja.userID
+}
+
+// GetAvailableTools returns a list of available tool names
+func (ja *JarvisAgent) GetAvailableTools() []string {
+	tools := []string{
+		// File Operations
+		"read_file", "write_file", "delete_file", "list_files",
+		// Execution Tools
+		"run_code", "execute_terminal", "evaluate_expression",
+		// Environment Management
+		"install_package", "check_version", "lint_code",
+		// Communication Tools
+		"commit_to_git", "create_pull_request", "comment_diff",
+		// Web Tools
+		"web_scraper", "Wikipedia",
+	}
+	return tools
+}
+
+// GetCapabilities returns a human-readable description of agent capabilities
+func (ja *JarvisAgent) GetCapabilities() map[string][]string {
+	return map[string][]string{
+		"File Operations": {
+			"Read file contents",
+			"Write content to files",
+			"Delete files",
+			"List directory contents",
+		},
+		"Code Execution": {
+			"Execute code (Python, Go, JavaScript, Bash)",
+			"Run terminal commands",
+			"Evaluate mathematical expressions",
+		},
+		"Environment Management": {
+			"Install packages (npm, pip, go get, etc.)",
+			"Check tool versions",
+			"Run code linters",
+		},
+		"Communication": {
+			"Git commit operations",
+			"Create GitHub/GitLab pull requests",
+			"Comment on diffs/PRs",
+		},
+		"Web & Research": {
+			"Scrape web content",
+			"Search Wikipedia",
+			"Retrieve online information",
+		},
+	}
+}
