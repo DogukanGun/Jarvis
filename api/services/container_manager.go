@@ -40,6 +40,11 @@ func (cm *ContainerManager) CreateContainer(userID string) (string, error) {
 		return "", fmt.Errorf("container already exists for user %s", userID)
 	}
 
+	// Ensure agent image is built
+	if err := cm.ensureAgentImageExists(); err != nil {
+		return "", fmt.Errorf("failed to ensure agent image exists: %v", err)
+	}
+
 	// Find available port (simple approach - in production use port management)
 	port := cm.findAvailablePort()
 
@@ -53,7 +58,7 @@ func (cm *ContainerManager) CreateContainer(userID string) (string, error) {
 		"-e", "USER_ID=" + userID,
 		"-e", "CONTAINER_NAME=" + containerName,
 		"--restart", "unless-stopped", // Auto-restart unless manually stopped
-		"jarvis-agent-base:latest", // Use the base image
+		"jarvis-agent:latest", // Use the agent image
 	}
 
 	cmd := exec.Command(dockerCmd[0], dockerCmd[1:]...)
@@ -315,6 +320,29 @@ func (cm *ContainerManager) CleanupIdleContainers(maxIdleTime time.Duration) err
 			}
 		}
 	}
+	return nil
+}
+
+// ensureAgentImageExists checks if the agent image exists and builds it if not
+func (cm *ContainerManager) ensureAgentImageExists() error {
+	// Check if image exists
+	cmd := exec.Command("docker", "images", "-q", "jarvis-agent:latest")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to check if image exists: %v", err)
+	}
+
+	// If image doesn't exist, build it
+	if strings.TrimSpace(string(output)) == "" {
+		fmt.Println("Building jarvis-agent image...")
+		buildCmd := exec.Command("docker", "build", "-t", "jarvis-agent:latest", "./agent")
+		buildOutput, err := buildCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to build agent image: %v, output: %s", err, string(buildOutput))
+		}
+		fmt.Println("Agent image built successfully")
+	}
+
 	return nil
 }
 

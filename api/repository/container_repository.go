@@ -41,10 +41,7 @@ func (r *ContainerRepository) Create(ctx context.Context, container *data.Contai
 func (r *ContainerRepository) GetByID(ctx context.Context, id string) (*data.ContainerInfo, error) {
 	var container data.ContainerInfo
 
-	filter := bson.M{"_id": id}
-	if oid, err := primitive.ObjectIDFromHex(id); err == nil {
-		filter = bson.M{"_id": oid}
-	}
+	filter := bson.M{"id": id}
 
 	err := r.collection.FindOne(ctx, filter).Decode(&container)
 	if err != nil {
@@ -60,7 +57,7 @@ func (r *ContainerRepository) GetByID(ctx context.Context, id string) (*data.Con
 func (r *ContainerRepository) GetByUserID(ctx context.Context, userID string) ([]*data.ContainerInfo, error) {
 	var containers []*data.ContainerInfo
 
-	filter := bson.M{"user_id": userID}
+	filter := bson.M{"userid": userID}
 	cursor, err := r.collection.Find(ctx, filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find containers: %w", err)
@@ -83,10 +80,7 @@ func (r *ContainerRepository) GetByUserID(ctx context.Context, userID string) ([
 }
 
 func (r *ContainerRepository) Update(ctx context.Context, container *data.ContainerInfo) error {
-	filter := bson.M{"_id": container.ID}
-	if oid, err := primitive.ObjectIDFromHex(container.ID); err == nil {
-		filter = bson.M{"_id": oid}
-	}
+	filter := bson.M{"id": container.ID}
 
 	update := bson.M{
 		"$set": bson.M{
@@ -110,10 +104,7 @@ func (r *ContainerRepository) Update(ctx context.Context, container *data.Contai
 }
 
 func (r *ContainerRepository) UpdateLastUsed(ctx context.Context, id string) error {
-	filter := bson.M{"_id": id}
-	if oid, err := primitive.ObjectIDFromHex(id); err == nil {
-		filter = bson.M{"_id": oid}
-	}
+	filter := bson.M{"id": id}
 
 	update := bson.M{
 		"$set": bson.M{
@@ -134,10 +125,7 @@ func (r *ContainerRepository) UpdateLastUsed(ctx context.Context, id string) err
 }
 
 func (r *ContainerRepository) Delete(ctx context.Context, id string) error {
-	filter := bson.M{"_id": id}
-	if oid, err := primitive.ObjectIDFromHex(id); err == nil {
-		filter = bson.M{"_id": oid}
-	}
+	filter := bson.M{"id": id}
 
 	result, err := r.collection.DeleteOne(ctx, filter)
 	if err != nil {

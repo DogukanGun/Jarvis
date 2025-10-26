@@ -42,9 +42,9 @@ func (r *UserRepository) Create(ctx context.Context, user *data.User) error {
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*data.User, error) {
 	var user data.User
 
-	filter := bson.M{"_id": id}
+	filter := bson.M{"id": id}
 	if oid, err := primitive.ObjectIDFromHex(id); err == nil {
-		filter = bson.M{"_id": oid}
+		filter = bson.M{"id": oid}
 	}
 
 	err := r.collection.FindOne(ctx, filter).Decode(&user)
@@ -104,10 +104,7 @@ func (r *UserRepository) GetByContainerID(ctx context.Context, containerID strin
 }
 
 func (r *UserRepository) Update(ctx context.Context, user *data.User) error {
-	filter := bson.M{"_id": user.ID}
-	if oid, err := primitive.ObjectIDFromHex(user.ID); err == nil {
-		filter = bson.M{"_id": oid}
-	}
+	filter := bson.M{"id": user.ID}
 
 	update := bson.M{
 		"$set": bson.M{
@@ -131,9 +128,9 @@ func (r *UserRepository) Update(ctx context.Context, user *data.User) error {
 }
 
 func (r *UserRepository) UpdateLastActive(ctx context.Context, id string) error {
-	filter := bson.M{"_id": id}
+	filter := bson.M{"id": id}
 	if oid, err := primitive.ObjectIDFromHex(id); err == nil {
-		filter = bson.M{"_id": oid}
+		filter = bson.M{"id": oid}
 	}
 
 	update := bson.M{
@@ -155,10 +152,7 @@ func (r *UserRepository) UpdateLastActive(ctx context.Context, id string) error 
 }
 
 func (r *UserRepository) UpdateContainerID(ctx context.Context, userID, containerID string) error {
-	filter := bson.M{"_id": userID}
-	if oid, err := primitive.ObjectIDFromHex(userID); err == nil {
-		filter = bson.M{"_id": oid}
-	}
+	filter := bson.M{"id": userID}
 
 	update := bson.M{
 		"$set": bson.M{
@@ -180,9 +174,9 @@ func (r *UserRepository) UpdateContainerID(ctx context.Context, userID, containe
 }
 
 func (r *UserRepository) Delete(ctx context.Context, id string) error {
-	filter := bson.M{"_id": id}
+	filter := bson.M{"id": id}
 	if oid, err := primitive.ObjectIDFromHex(id); err == nil {
-		filter = bson.M{"_id": oid}
+		filter = bson.M{"id": oid}
 	}
 
 	result, err := r.collection.DeleteOne(ctx, filter)

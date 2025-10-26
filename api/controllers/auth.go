@@ -7,6 +7,7 @@ import (
 	"errors"
 	"jarvis/api/data"
 	"jarvis/api/services"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -64,6 +65,7 @@ func AuthMiddleware(userManager *services.UserManager) func(http.Handler) http.H
 			}
 
 			// Validate user exists
+			log.Print(claims.UserID)
 			user, err := userManager.GetUser(claims.UserID)
 			if err != nil {
 				sendError(w, "Invalid token or user not found", http.StatusUnauthorized)
