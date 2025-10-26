@@ -28,6 +28,9 @@ func NewAgentServer(userID string) (*AgentServer, error) {
 		UserID:      userID,
 		OpenAIModel: getEnvOrDefault("OPENAI_MODEL", "gpt-4o-mini"),
 		OpenAIKey:   os.Getenv("OPENAI_API_KEY"),
+		Neo4jURI:    getEnvOrDefault("NEO4J_URI", "bolt://neo4j:7687"),
+		Neo4jUser:   getEnvOrDefault("NEO4J_USER", "neo4j"),
+		Neo4jPass:   getEnvOrDefault("NEO4J_PASSWORD", "jarvispassword"),
 	}
 
 	jarvisAgent, err := NewJarvisAgent(config)

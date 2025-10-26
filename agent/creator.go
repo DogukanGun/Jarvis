@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/tmc/langchaingo/agents"
 	"github.com/tmc/langchaingo/llms/openai"
@@ -13,8 +14,9 @@ import (
 
 // JarvisAgent represents a Jarvis AI agent instance
 type JarvisAgent struct {
-	executor *agents.Executor
-	userID   string
+	executor       *agents.Executor
+	userID         string
+	knowledgeGraph *KnowledgeGraph
 }
 
 // AgentConfig holds configuration for creating an agent
@@ -22,6 +24,9 @@ type AgentConfig struct {
 	UserID      string
 	OpenAIModel string
 	OpenAIKey   string
+	Neo4jURI    string
+	Neo4jUser   string
+	Neo4jPass   string
 }
 
 // NewJarvisAgent creates a new Jarvis agent instance
@@ -71,13 +76,23 @@ func NewJarvisAgent(config AgentConfig) (*JarvisAgent, error) {
 	// Add external langchain tools
 	allTools = append(allTools, wikipediaTool)
 
+	// Initialize knowledge graph if Neo4j config is provided
+	var kg *KnowledgeGraph
+	if config.Neo4jURI != "" {
+		kg, err = NewKnowledgeGraph(config.Neo4jURI, config.Neo4jUser, config.Neo4jPass, config.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize knowledge graph: %v", err)
+		}
+	}
+
 	// Create OpenAI Functions agent
 	agent := agents.NewOpenAIFunctionsAgent(llm, allTools)
 	executor := agents.NewExecutor(agent)
 
 	return &JarvisAgent{
-		executor: executor,
-		userID:   config.UserID,
+		executor:       executor,
+		userID:         config.UserID,
+		knowledgeGraph: kg,
 	}, nil
 }
 
@@ -87,20 +102,68 @@ func (ja *JarvisAgent) ProcessMessage(ctx context.Context, message string) (stri
 		return "", fmt.Errorf("message cannot be empty")
 	}
 
+	var enhancedInput string = message
+
+	// Enhance input with knowledge graph context if available
+	if ja.knowledgeGraph != nil {
+		// Get relevant context from knowledge graph
+		context, err := ja.knowledgeGraph.GetUserContext(message, 5)
+		if err == nil && context != "" {
+			enhancedInput = fmt.Sprintf("%s\n\n%s", context, message)
+		}
+
+		// Get user preferences
+		prefs, err := ja.knowledgeGraph.GetUserPreferences()
+		if err == nil && len(prefs) > 0 {
+			prefsStr := "User preferences:\n"
+			for key, value := range prefs {
+				prefsStr += fmt.Sprintf("- %s: %s\n", key, value)
+			}
+			enhancedInput = fmt.Sprintf("%s\n%s\nUser message: %s", prefsStr, context, message)
+		}
+
+		// Store the user message as memory
+		memory := Memory{
+			ID:        fmt.Sprintf("msg_%d", time.Now().Unix()),
+			UserID:    ja.userID,
+			Content:   message,
+			Type:      "user_message",
+			Timestamp: time.Now(),
+			Context:   "conversation",
+		}
+		ja.knowledgeGraph.AddMemory(memory)
+	}
+
 	// Process message with agent
 	result, err := ja.executor.Call(ctx, map[string]any{
-		"input": message,
+		"input": enhancedInput,
 	})
 	if err != nil {
 		return "", fmt.Errorf("agent processing error: %v", err)
 	}
 
 	// Extract response
+	var response string
 	if output, ok := result["output"]; ok {
-		return fmt.Sprintf("%v", output), nil
+		response = fmt.Sprintf("%v", output)
+	} else {
+		response = fmt.Sprintf("%v", result)
 	}
 
-	return fmt.Sprintf("%v", result), nil
+	// Store the agent response as memory
+	if ja.knowledgeGraph != nil {
+		agentMemory := Memory{
+			ID:        fmt.Sprintf("resp_%d", time.Now().Unix()),
+			UserID:    ja.userID,
+			Content:   response,
+			Type:      "agent_response",
+			Timestamp: time.Now(),
+			Context:   "conversation",
+		}
+		ja.knowledgeGraph.AddMemory(agentMemory)
+	}
+
+	return response, nil
 }
 
 // GetUserID returns the user ID associated with this agent

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -45,26 +46,24 @@ func (cm *ContainerManager) CreateContainer(userID string) (string, error) {
 		return "", fmt.Errorf("failed to ensure agent image exists: %v", err)
 	}
 
+	// Ensure jarvis network exists
+	if err := cm.ensureNetworkExists(); err != nil {
+		return "", fmt.Errorf("failed to ensure network exists: %v", err)
+	}
+
 	// Find available port (simple approach - in production use port management)
 	port := cm.findAvailablePort()
 
-	// Docker command to run the Jarvis agent with user-specific configuration
-	dockerCmd := []string{
-		"docker", "run", "-d",
-		"--name", containerName,
-		"-p", fmt.Sprintf("%d:8080", port),
-		"-e", "OPENAI_API_KEY=" + getEnvOrDefault("OPENAI_API_KEY", ""),
-		"-e", "AGENT_MODE=http",
-		"-e", "USER_ID=" + userID,
-		"-e", "CONTAINER_NAME=" + containerName,
-		"--restart", "unless-stopped", // Auto-restart unless manually stopped
-		"jarvis-agent:latest", // Use the agent image
+	// Create a docker-compose service definition for this user's agent
+	if err := cm.createUserAgentService(userID, containerName, port); err != nil {
+		return "", fmt.Errorf("failed to create user agent service: %v", err)
 	}
 
-	cmd := exec.Command(dockerCmd[0], dockerCmd[1:]...)
+	// Start the user's agent service using docker-compose
+	cmd := exec.Command("docker-compose", "-f", "./agent/docker-compose.yml", "-f", fmt.Sprintf("./agent/docker-compose.user-%s.yml", userID), "up", "-d", fmt.Sprintf("agent-%s", userID))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("failed to create container: %v, output: %s", err, string(output))
+		return "", fmt.Errorf("failed to start user agent service: %v, output: %s", err, string(output))
 	}
 
 	// Store container info in database
@@ -290,6 +289,27 @@ func (cm *ContainerManager) findAvailablePort() int {
 		usedPorts[container.Port] = true
 	}
 
+	// Also check for actually running Docker containers to avoid conflicts
+	cmd := exec.Command("docker", "ps", "--format", "{{.Ports}}")
+	output, err := cmd.Output()
+	if err == nil {
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			// Parse Docker port mappings like "0.0.0.0:9000->8080/tcp"
+			if strings.Contains(line, "->") {
+				parts := strings.Split(line, "->")
+				if len(parts) > 0 {
+					portPart := strings.Split(parts[0], ":")
+					if len(portPart) > 1 {
+						if port, err := strconv.Atoi(portPart[len(portPart)-1]); err == nil {
+							usedPorts[port] = true
+						}
+					}
+				}
+			}
+		}
+	}
+
 	for port := 9000; port < 10000; port++ {
 		if !usedPorts[port] {
 			return port
@@ -344,6 +364,66 @@ func (cm *ContainerManager) ensureAgentImageExists() error {
 	}
 
 	return nil
+}
+
+// ensureNetworkExists checks if the jarvis network exists and creates it if not
+func (cm *ContainerManager) ensureNetworkExists() error {
+	// Check if agent_jarvis-network exists (from docker-compose)
+	cmd := exec.Command("docker", "network", "inspect", "agent_jarvis-network")
+	err := cmd.Run()
+	if err == nil {
+		return nil // Network already exists
+	}
+
+	// If not, check for standalone jarvis-network
+	cmd = exec.Command("docker", "network", "inspect", "jarvis-network")
+	err = cmd.Run()
+	if err == nil {
+		return nil // Network already exists
+	}
+
+	// Create the network
+	fmt.Println("Creating jarvis-network...")
+	createCmd := exec.Command("docker", "network", "create", "jarvis-network")
+	output, err := createCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to create jarvis-network: %v, output: %s", err, string(output))
+	}
+	fmt.Println("Network jarvis-network created successfully")
+	return nil
+}
+
+// createUserAgentService creates a docker-compose override file for a user's agent service
+func (cm *ContainerManager) createUserAgentService(userID, containerName string, port int) error {
+	composeOverride := fmt.Sprintf(`services:
+  agent-%s:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: %s
+    ports:
+      - "%d:8080"
+    environment:
+      - OPENAI_API_KEY=%s
+      - AGENT_MODE=http
+      - USER_ID=%s
+      - CONTAINER_NAME=%s
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=jarvispassword
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+`, userID, containerName, port,
+		getEnvOrDefault("OPENAI_API_KEY", ""),
+		userID, containerName)
+
+	// Write the override file
+	overrideFile := fmt.Sprintf("./agent/docker-compose.user-%s.yml", userID)
+	return os.WriteFile(overrideFile, []byte(composeOverride), 0644)
 }
 
 func getEnvOrDefault(key, defaultValue string) string {

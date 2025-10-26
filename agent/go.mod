@@ -3,8 +3,7 @@ module jarvis/agent
 go 1.24.4
 
 require (
-	github.com/chzyer/readline v1.5.1
-	github.com/spf13/cobra v1.10.1
+	github.com/neo4j/neo4j-go-driver/v5 v5.24.0
 	github.com/tmc/langchaingo v0.1.14
 )
 
@@ -27,7 +26,6 @@ require (
 	github.com/goph/emperror v0.17.2 // indirect
 	github.com/huandu/xstrings v1.3.3 // indirect
 	github.com/imdario/mergo v0.3.13 // indirect
-	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kennygrant/sanitize v1.2.4 // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
@@ -42,7 +40,6 @@ require (
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
-	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
 	github.com/yargevad/filepathx v1.0.0 // indirect
 	go.starlark.net v0.0.0-20230302034142-4b1e35fe2254 // indirect
