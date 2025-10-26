@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"jarvis/agent/db"
 	"time"
 
 	"github.com/tmc/langchaingo/agents"
@@ -16,7 +17,7 @@ import (
 type JarvisAgent struct {
 	executor       *agents.Executor
 	userID         string
-	knowledgeGraph *KnowledgeGraph
+	knowledgeGraph *db.KnowledgeGraph
 }
 
 // AgentConfig holds configuration for creating an agent
@@ -77,9 +78,9 @@ func NewJarvisAgent(config AgentConfig) (*JarvisAgent, error) {
 	allTools = append(allTools, wikipediaTool)
 
 	// Initialize knowledge graph if Neo4j config is provided
-	var kg *KnowledgeGraph
+	var kg *db.KnowledgeGraph
 	if config.Neo4jURI != "" {
-		kg, err = NewKnowledgeGraph(config.Neo4jURI, config.Neo4jUser, config.Neo4jPass, config.UserID)
+		kg, err = db.NewKnowledgeGraph(config.Neo4jURI, config.Neo4jUser, config.Neo4jPass, config.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize knowledge graph: %v", err)
 		}
@@ -123,7 +124,7 @@ func (ja *JarvisAgent) ProcessMessage(ctx context.Context, message string) (stri
 		}
 
 		// Store the user message as memory
-		memory := Memory{
+		memory := db.Memory{
 			ID:        fmt.Sprintf("msg_%d", time.Now().Unix()),
 			UserID:    ja.userID,
 			Content:   message,
@@ -152,7 +153,7 @@ func (ja *JarvisAgent) ProcessMessage(ctx context.Context, message string) (stri
 
 	// Store the agent response as memory
 	if ja.knowledgeGraph != nil {
-		agentMemory := Memory{
+		agentMemory := db.Memory{
 			ID:        fmt.Sprintf("resp_%d", time.Now().Unix()),
 			UserID:    ja.userID,
 			Content:   response,
