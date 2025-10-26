@@ -61,8 +61,12 @@ func main() {
 	authMiddleware := controllers.AuthMiddleware(userManager)
 
 	// Swagger documentation
+	swaggerHost := "jarvis.dogukangun.com"
+	if os.Getenv("OS") == "dev" {
+		swaggerHost = "localhost:8080"
+	}
 	r.Get("/swagger/*", httpSwagger.Handler(
-		httpSwagger.URL("http://localhost:8080/swagger/doc.json"),
+		httpSwagger.URL(fmt.Sprintf("http://%s/swagger/doc.json", swaggerHost)),
 	))
 
 	// Health check (public endpoint)
