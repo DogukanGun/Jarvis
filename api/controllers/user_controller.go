@@ -1,10 +1,14 @@
 package controllers
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
+	"golang.org/x/crypto/scrypt"
 	"jarvis/api/data"
 	"jarvis/api/services"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -27,6 +31,7 @@ func NewUserController(userManager *services.UserManager, containerManager *serv
 type RegisterRequest struct {
 	Username string `json:"username" validate:"required,min=3,max=50"`
 	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=6"`
 }
 
 // RegisterResponse represents user registration response
@@ -54,6 +59,75 @@ type UserProfileResponse struct {
 type UpdateUserRequest struct {
 	Username string `json:"username,omitempty" validate:"omitempty,min=3,max=50"`
 	Email    string `json:"email,omitempty" validate:"omitempty,email"`
+}
+
+// LoginRequest represents user login data
+type LoginRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required"`
+}
+
+// LoginResponse represents user login response
+type LoginResponse struct {
+	UserID      string    `json:"user_id"`
+	Username    string    `json:"username"`
+	Email       string    `json:"email"`
+	ContainerID string    `json:"container_id"`
+	Token       string    `json:"token"`
+	LastActive  time.Time `json:"last_active"`
+}
+
+// hashPassword creates a hashed password using scrypt
+func hashPassword(password string) (string, error) {
+	salt := make([]byte, 32)
+	_, err := rand.Read(salt)
+	if err != nil {
+		return "", err
+	}
+
+	dk, err := scrypt.Key([]byte(password), salt, 32768, 8, 1, 32)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(salt) + ":" + base64.StdEncoding.EncodeToString(dk), nil
+}
+
+// verifyPassword verifies a password against its hash
+func verifyPassword(password, hash string) bool {
+	// Split the hash into salt and key parts
+	parts := strings.Split(hash, ":")
+	if len(parts) != 2 {
+		return false
+	}
+
+	salt, err := base64.StdEncoding.DecodeString(parts[0])
+	if err != nil {
+		return false
+	}
+
+	storedKey, err := base64.StdEncoding.DecodeString(parts[1])
+	if err != nil {
+		return false
+	}
+
+	dk, err := scrypt.Key([]byte(password), salt, 32768, 8, 1, 32)
+	if err != nil {
+		return false
+	}
+
+	// Compare the derived key with the stored key
+	if len(dk) != len(storedKey) {
+		return false
+	}
+
+	for i := range dk {
+		if dk[i] != storedKey[i] {
+			return false
+		}
+	}
+
+	return true
 }
 
 // RegisterUser creates a new user and spawns their agent container
@@ -84,6 +158,14 @@ func (uc *UserController) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		sendError(w, "Email is required", http.StatusBadRequest)
 		return
 	}
+	if req.Password == "" {
+		sendError(w, "Password is required", http.StatusBadRequest)
+		return
+	}
+	if len(req.Password) < 6 {
+		sendError(w, "Password must be at least 6 characters long", http.StatusBadRequest)
+		return
+	}
 
 	// Check if user already exists
 	if uc.userManager.UserExists(req.Username) {
@@ -97,6 +179,13 @@ func (uc *UserController) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Hash the password
+	hashedPassword, err := hashPassword(req.Password)
+	if err != nil {
+		sendError(w, "Failed to process password", http.StatusInternalServerError)
+		return
+	}
+
 	// Generate user ID
 	userID := uuid.New().String()
 
@@ -105,6 +194,7 @@ func (uc *UserController) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		ID:        userID,
 		Username:  req.Username,
 		Email:     req.Email,
+		Password:  hashedPassword,
 		CreatedAt: time.Now(),
 	}
 
@@ -382,4 +472,68 @@ func (uc *UserController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendSuccess(w, nil, "User account deleted successfully", http.StatusOK)
+}
+
+// LoginUser authenticates a user and returns a token
+// @Summary Login user
+// @Description Authenticates a user with email and password, returns a token
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param request body LoginRequest true "User login credentials"
+// @Success 200 {object} LoginResponse "Login successful"
+// @Failure 400 {object} ErrorResponse "Invalid request body"
+// @Failure 401 {object} ErrorResponse "Invalid credentials"
+// @Failure 404 {object} ErrorResponse "User not found"
+// @Router /api/v1/users/login [post]
+func (uc *UserController) LoginUser(w http.ResponseWriter, r *http.Request) {
+	var req LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendError(w, "Invalid JSON payload", http.StatusBadRequest)
+		return
+	}
+
+	// Validate required fields
+	if req.Email == "" {
+		sendError(w, "Email is required", http.StatusBadRequest)
+		return
+	}
+	if req.Password == "" {
+		sendError(w, "Password is required", http.StatusBadRequest)
+		return
+	}
+
+	// Find user by email
+	user, err := uc.userManager.GetUserByEmail(req.Email)
+	if err != nil || user == nil {
+		sendError(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	// Verify password
+	if !verifyPassword(req.Password, user.Password) {
+		sendError(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	// Update user's last active time
+	uc.userManager.UpdateLastActive(user.ID)
+
+	// Generate token for the user (24 hours expiration)
+	token, err := EncodeToken(user.ID, 24)
+	if err != nil {
+		sendError(w, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := LoginResponse{
+		UserID:      user.ID,
+		Username:    user.Username,
+		Email:       user.Email,
+		ContainerID: user.ContainerID,
+		Token:       token,
+		LastActive:  user.LastActive,
+	}
+
+	sendData(w, response, http.StatusOK)
 }

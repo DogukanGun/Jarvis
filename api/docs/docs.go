@@ -269,6 +269,58 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/users/login": {
+            "post": {
+                "description": "Authenticates a user with email and password, returns a token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Login user",
+                "parameters": [
+                    {
+                        "description": "User login credentials",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Login successful",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid credentials",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/users/profile": {
             "get": {
                 "description": "Returns the authenticated user's profile information",
@@ -583,6 +635,44 @@ const docTemplate = `{
                 }
             }
         },
+        "controllers.LoginRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "last_active": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "controllers.MessageRequest": {
             "type": "object",
             "required": [
@@ -615,11 +705,16 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "email",
+                "password",
                 "username"
             ],
             "properties": {
                 "email": {
                     "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 6
                 },
                 "username": {
                     "type": "string",

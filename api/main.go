@@ -81,8 +81,9 @@ func main() {
 	r.Route("/api/v1", func(r chi.Router) {
 		// Public routes (no authentication required)
 		r.Group(func(r chi.Router) {
-			// User registration
+			// User registration and login
 			r.Post("/users/register", userController.RegisterUser)
+			r.Post("/users/login", userController.LoginUser)
 		})
 
 		// Protected routes (authentication required)
@@ -115,6 +116,7 @@ func main() {
 	fmt.Printf("Public endpoints:\n")
 	fmt.Printf("  GET  /health                        - Health check\n")
 	fmt.Printf("  POST /api/v1/users/register         - Register new user and create agent container\n")
+	fmt.Printf("  POST /api/v1/users/login            - Login with email and password\n")
 	fmt.Printf("  GET  /swagger/*                     - Swagger API documentation\n")
 	fmt.Printf("\nProtected endpoints (require Bearer token):\n")
 	fmt.Printf("  GET  /api/v1/users/profile          - Get authenticated user's profile\n")
