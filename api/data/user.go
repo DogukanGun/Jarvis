@@ -11,3 +11,19 @@ type User struct {
 	CreatedAt   time.Time `json:"created_at"`
 	LastActive  time.Time `json:"last_active"`
 }
+
+func (u *User) GetID() string {
+	return u.ID
+}
+
+func (u *User) SetID(id string) {
+	u.ID = id
+}
+
+func (u *User) SetCreatedAt(t time.Time) {
+	u.CreatedAt = t
+}
+
+func (u *User) SetLastActive(t time.Time) {
+	u.LastActive = t
+}
