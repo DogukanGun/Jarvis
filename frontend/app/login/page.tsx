@@ -7,8 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sparkles, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { apiClient } from "@/lib/api-client";
+import { toast } from "sonner";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -19,13 +23,41 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      console.log('Login attempt:', { email, password, rememberMe });
+    try {
+      // Call backend API
+      const response = await apiClient.auth.login({ email, password });
+      
+      // Store auth token and user data
+      localStorage.setItem('auth-token', response.token);
+      localStorage.setItem('user', JSON.stringify(response));
+      
+      // Store container info if available
+      if (response.container_id) {
+        localStorage.setItem('container-info', JSON.stringify({
+          container_id: response.container_id,
+          user_id: response.user_id,
+        }));
+      }
+      
+      // Also set cookie for middleware
+      document.cookie = `auth-token=${response.token}; path=/; max-age=${60 * 60 * 24 * 7}`; // 7 days
+      
+      // Show success toast
+      toast.success('Login successful!', {
+        description: 'Welcome back to Jarvis',
+      });
+      
+      // Redirect to dashboard
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 500);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Login failed. Please check your credentials.';
+      toast.error('Login failed', {
+        description: errorMessage,
+      });
       setIsLoading(false);
-      // Redirect to dashboard on success
-      window.location.href = '/dashboard';
-    }, 1500);
+    }
   };
 
   return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,17 +33,31 @@ import {
   X,
   Wallet,
   Copy,
-  ExternalLink
+  ExternalLink,
+  Play,
+  Square,
+  Loader2,
+  User,
+  Settings,
+  LogOut
 } from "lucide-react";
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { apiClient, saveContainerInfo } from "@/lib/api-client";
+import type { Container, AuthResponse } from "@/lib/api-client";
+import { toast } from "sonner";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const [walletAddress] = useState('0x742d...92a8');
   const [walletBalance] = useState('9.99');
+  const [container, setContainer] = useState<Container | null>(null);
+  const [containerLoading, setContainerLoading] = useState(false);
+  const [userProfile, setUserProfile] = useState<AuthResponse | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [notifications, setNotifications] = useState([
     { id: 1, type: 'success', title: 'Agent Started', message: 'Your agent is now running', unread: true },
     { id: 2, type: 'info', title: 'New Feature', message: 'Voice input is now available', unread: true },
@@ -54,6 +68,85 @@ export default function DashboardLayout({
   const pathname = usePathname();
   
   const unreadCount = notifications.filter(n => n.unread).length;
+
+  // Initialize container and user profile on mount
+  useEffect(() => {
+    const initData = async () => {
+      try {
+        // Fetch container status
+        setContainerLoading(true);
+        const status = await apiClient.containers.getStatus();
+        setContainer(status);
+        saveContainerInfo(status);
+        setContainerLoading(false);
+        
+        // Fetch user profile
+        setProfileLoading(true);
+        const profile = await apiClient.users.getProfile();
+        setUserProfile(profile);
+        // Update localStorage with fresh user data
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('user', JSON.stringify(profile));
+        }
+        setProfileLoading(false);
+        
+        toast.success('Welcome back!', {
+          description: `Agent is ${status.is_running ? 'running' : 'stopped'}`,
+        });
+      } catch (error) {
+        console.error('Failed to initialize dashboard:', error);
+        setContainerLoading(false);
+        setProfileLoading(false);
+        toast.error('Failed to load dashboard data', {
+          description: error instanceof Error ? error.message : 'Please try refreshing the page',
+        });
+      }
+    };
+
+    initData();
+  }, []);
+
+  const handleStartContainer = async () => {
+    if (!container) return;
+    try {
+      setContainerLoading(true);
+      await apiClient.containers.start();
+      const status = await apiClient.containers.getStatus();
+      setContainer(status);
+      saveContainerInfo(status);
+      toast.success('Agent started successfully', {
+        description: 'Your agent is now ready to use',
+      });
+    } catch (error) {
+      console.error('Failed to start container:', error);
+      toast.error('Failed to start agent', {
+        description: error instanceof Error ? error.message : 'Please try again',
+      });
+    } finally {
+      setContainerLoading(false);
+    }
+  };
+
+  const handleStopContainer = async () => {
+    if (!container) return;
+    try {
+      setContainerLoading(true);
+      await apiClient.containers.stop();
+      const status = await apiClient.containers.getStatus();
+      setContainer(status);
+      saveContainerInfo(status);
+      toast.info('Agent stopped', {
+        description: 'Your agent has been stopped',
+      });
+    } catch (error) {
+      console.error('Failed to stop container:', error);
+      toast.error('Failed to stop agent', {
+        description: error instanceof Error ? error.message : 'Please try again',
+      });
+    } finally {
+      setContainerLoading(false);
+    }
+  };
   
   const markAsRead = (id: number) => {
     setNotifications(notifications.map(n => 
@@ -128,6 +221,66 @@ export default function DashboardLayout({
           </SidebarHeader>
 
           <SidebarContent className="bg-[#1e1b4b]">
+            {/* Agent Status */}
+            <SidebarGroup className="bg-[#1e1b4b]">
+              <SidebarGroupLabel className="text-xs font-semibold text-white/60 px-4 bg-[#1e1b4b]">
+                AGENT STATUS
+              </SidebarGroupLabel>
+              <SidebarGroupContent className="bg-[#1e1b4b] px-4 pb-3">
+                <div className="bg-white/5 rounded-lg p-3 space-y-2">
+                  {containerLoading ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 text-[#F7931A] animate-spin" />
+                      <span className="text-sm text-white/60">Initializing...</span>
+                    </div>
+                  ) : container ? (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-white/40">Status</span>
+                        <div className="flex items-center gap-1.5">
+                          <div className={`w-1.5 h-1.5 rounded-full ${
+                            container.is_running ? 'bg-green-400' : 'bg-red-400'
+                          }`}></div>
+                          <span className="text-xs font-medium text-white/80 capitalize">
+                            {container.is_running ? 'Running' : 'Stopped'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-white/40">Port</span>
+                        <span className="text-xs font-mono text-white/60">{container.port}</span>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        {container.is_running ? (
+                          <Button
+                            onClick={handleStopContainer}
+                            disabled={containerLoading}
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 h-7 text-xs bg-red-500/10 border-red-500/20 text-red-300 hover:bg-red-500/20"
+                          >
+                            <Square className="w-3 h-3 mr-1" />
+                            Stop
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={handleStartContainer}
+                            disabled={containerLoading}
+                            size="sm"
+                            className="flex-1 h-7 text-xs bg-green-500/10 border-green-500/20 text-green-300 hover:bg-green-500/20"
+                          >
+                            <Play className="w-3 h-3 mr-1" />
+                            Start
+                          </Button>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-xs text-white/40 text-center">No agent container</div>
+                  )}
+                </div>
+              </SidebarGroupContent>
+            </SidebarGroup>
            
             {/* Recent Conversations */}
             <SidebarGroup className="bg-[#1e1b4b]">
@@ -224,6 +377,7 @@ export default function DashboardLayout({
               </div>
             </div>
 
+            {/* Notifications Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="relative p-2 hover:bg-white/10 rounded-lg transition-colors">
@@ -291,6 +445,60 @@ export default function DashboardLayout({
                     ))}
                   </div>
                 )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* User Profile Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 p-2 hover:bg-white/10 rounded-lg transition-colors">
+                  <div className="w-8 h-8 bg-linear-to-br from-[#F7931A] to-[#FCD34D] rounded-full flex items-center justify-center">
+                    <User className="w-4 h-4 text-white" />
+                  </div>
+                  {profileLoading ? (
+                    <Loader2 className="w-4 h-4 text-white/40 animate-spin" />
+                  ) : userProfile && (
+                    <div className="text-left hidden md:block">
+                      <div className="text-sm font-medium text-white">{userProfile.username}</div>
+                      <div className="text-xs text-white/40">{userProfile.email}</div>
+                    </div>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-[#1e1b4b] border-white/10">
+                <DropdownMenuLabel className="text-white">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">{userProfile?.username || 'User'}</p>
+                    <p className="text-xs text-white/40">{userProfile?.email || ''}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem 
+                  className="text-white/80 hover:bg-white/5 cursor-pointer"
+                  onClick={() => router.push('/dashboard/profile')}
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="text-white/80 hover:bg-white/5 cursor-pointer"
+                  onClick={() => router.push('/dashboard/settings')}
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem 
+                  className="text-red-400 hover:bg-red-500/10 cursor-pointer"
+                  onClick={() => {
+                    apiClient.auth.logout();
+                    toast.success('Logged out successfully');
+                    router.push('/login');
+                  }}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

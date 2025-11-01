@@ -14,8 +14,11 @@ import {
   Mic,
   Send,
   Paperclip,
-  X
+  X,
+  Loader2
 } from "lucide-react";
+import { apiClient } from "@/lib/api-client";
+import { toast } from "sonner";
 
 export default function DashboardPage() {
   const [inputText, setInputText] = useState('');
@@ -23,6 +26,7 @@ export default function DashboardPage() {
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'agent'; content: string }>>([]);
   const [voiceError, setVoiceError] = useState<string>('');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [isLoadingResponse, setIsLoadingResponse] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -44,20 +48,51 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputText.trim() && attachedFiles.length === 0) return;
     
-    setMessages([...messages, { role: 'user', content: inputText }]);
+    const userMessage = inputText;
+    
+    // Add user message to chat
+    setMessages([...messages, { role: 'user', content: userMessage }]);
     setInputText('');
     setAttachedFiles([]);
+    setIsLoadingResponse(true);
     
-    // Simulate agent response (replace with actual API call)
-    setTimeout(() => {
+    try {
+      // Send message to agent via backend API
+      const response = await apiClient.containers.sendMessage({
+        message: userMessage,
+      });
+      
+      // Add agent response to chat
       setMessages(prev => [...prev, { 
         role: 'agent', 
-        content: 'I\'m processing your request. This is where the agent response would appear with tool executions and results.' 
+        content: response.response 
       }]);
-    }, 1000);
+      
+      // Show success toast for empty responses
+      if (!response.response || response.response.trim() === '') {
+        toast.info('Agent received your message', {
+          description: 'The agent is processing your request.',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to communicate with agent. Please check if the agent is running.';
+      
+      // Show error toast
+      toast.error('Failed to send message', {
+        description: errorMessage,
+      });
+      
+      setMessages(prev => [...prev, { 
+        role: 'agent', 
+        content: `Error: ${errorMessage}` 
+      }]);
+    } finally {
+      setIsLoadingResponse(false);
+    }
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,6 +100,11 @@ export default function DashboardPage() {
     if (files) {
       const newFiles = Array.from(files);
       setAttachedFiles(prev => [...prev, ...newFiles]);
+      
+      // Show success toast
+      toast.success('Files attached', {
+        description: `${newFiles.length} file(s) ready to send`,
+      });
     }
   };
 
@@ -73,7 +113,13 @@ export default function DashboardPage() {
   };
 
   const removeFile = (index: number) => {
+    const fileName = attachedFiles[index].name;
     setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+    
+    // Show toast notification
+    toast.info('File removed', {
+      description: `${fileName} has been removed`,
+    });
   };
 
   const handleVoiceInput = async () => {
@@ -84,7 +130,9 @@ export default function DashboardPage() {
       
       // Check for browser support
       if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        alert('Voice input is not supported in your browser. Please use Chrome or Edge.');
+        toast.error('Voice input not supported', {
+          description: 'Please use Chrome or Edge browser for voice input.',
+        });
         setIsRecording(false);
         return;
       }
@@ -398,11 +446,20 @@ export default function DashboardPage() {
                   <Button 
                     size="sm"
                     onClick={handleSendMessage}
-                    disabled={(!inputText.trim() && attachedFiles.length === 0) || isRecording}
+                    disabled={(!inputText.trim() && attachedFiles.length === 0) || isRecording || isLoadingResponse}
                     className="bg-linear-to-r from-[#F7931A] to-[#F97316] hover:from-[#FCD34D] hover:to-[#F7931A] text-white disabled:opacity-50 disabled:cursor-not-allowed h-8"
                   >
-                    <Send className="w-3 h-3 mr-1.5" />
-                    Send
+                    {isLoadingResponse ? (
+                      <>
+                        <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3 h-3 mr-1.5" />
+                        Send
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
