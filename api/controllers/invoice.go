@@ -22,25 +22,25 @@ func NewInvoiceController(invoiceManager *services.InvoiceManager) *InvoiceContr
 
 // CreateInvoiceRequest represents invoice creation data
 type CreateInvoiceRequest struct {
-	UserID               string  `json:"user_id" validate:"required"`
-	Month                int     `json:"month" validate:"required,min=1,max=12"`
-	Year                 int     `json:"year" validate:"required,min=2020"`
-	Amount               float64 `json:"amount" validate:"required,min=0"`
-	PaymentValidationUrl string  `json:"payment_validation_url" validate:"required,url"`
+	UserID          string  `json:"user_id" validate:"required"`
+	Month           int     `json:"month" validate:"required,min=1,max=12"`
+	Year            int     `json:"year" validate:"required,min=2020"`
+	Amount          float64 `json:"amount" validate:"required,min=0"`
+	TransactionHash string  `json:"transaction_hash" validate:"required"`
 }
 
 // InvoiceResponse represents invoice data for API responses
 type InvoiceResponse struct {
-	ID                   string     `json:"id"`
-	UserID               string     `json:"user_id"`
-	Month                int        `json:"month"`
-	Year                 int        `json:"year"`
-	Amount               float64    `json:"amount"`
-	PaymentValidationUrl string     `json:"payment_validation_url"`
-	IsPaid               bool       `json:"is_paid"`
-	CreatedAt            time.Time  `json:"created_at"`
-	LastActive           time.Time  `json:"last_active"`
-	PaidAt               *time.Time `json:"paid_at,omitempty"`
+	ID              string     `json:"id"`
+	UserID          string     `json:"user_id"`
+	Month           int        `json:"month"`
+	Year            int        `json:"year"`
+	Amount          float64    `json:"amount"`
+	TransactionHash string     `json:"transaction_hash"`
+	IsPaid          bool       `json:"is_paid"`
+	CreatedAt       time.Time  `json:"created_at"`
+	LastActive      time.Time  `json:"last_active"`
+	PaidAt          *time.Time `json:"paid_at,omitempty"`
 }
 
 // GenerateMonthlyInvoiceRequest represents monthly invoice generation data
@@ -59,16 +59,16 @@ type UpdateInvoiceRequest struct {
 
 func invoiceToResponse(invoice *data.Invoice) InvoiceResponse {
 	return InvoiceResponse{
-		ID:                   invoice.ID,
-		UserID:               invoice.UserID,
-		Month:                invoice.Month,
-		Year:                 invoice.Year,
-		Amount:               invoice.Amount,
-		PaymentValidationUrl: invoice.PaymentValidationUrl,
-		IsPaid:               invoice.IsPaid,
-		CreatedAt:            invoice.CreatedAt,
-		LastActive:           invoice.LastActive,
-		PaidAt:               invoice.PaidAt,
+		ID:              invoice.ID,
+		UserID:          invoice.UserID,
+		Month:           invoice.Month,
+		Year:            invoice.Year,
+		Amount:          invoice.Amount,
+		TransactionHash: invoice.PaymentValidationUrl,
+		IsPaid:          invoice.IsPaid,
+		CreatedAt:       invoice.CreatedAt,
+		LastActive:      invoice.LastActive,
+		PaidAt:          invoice.PaidAt,
 	}
 }
 
@@ -124,13 +124,13 @@ func (ic *InvoiceController) CreateInvoice(w http.ResponseWriter, r *http.Reques
 		sendError(w, "Amount must be greater than 0", http.StatusBadRequest)
 		return
 	}
-	if req.PaymentValidationUrl == "" {
-		sendError(w, "Payment validation URL is required", http.StatusBadRequest)
+	if req.TransactionHash == "" {
+		sendError(w, "Transaction hash is required", http.StatusBadRequest)
 		return
 	}
 
 	// Create invoice
-	invoice, err := ic.invoiceManager.CreateInvoice(req.UserID, req.Month, req.Year, req.Amount, req.PaymentValidationUrl)
+	invoice, err := ic.invoiceManager.CreateInvoice(req.UserID, req.Month, req.Year, req.Amount, req.TransactionHash)
 	if err != nil {
 		if err.Error() == "invoice already exists" {
 			sendError(w, err.Error(), http.StatusConflict)

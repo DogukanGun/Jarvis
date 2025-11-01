@@ -53,7 +53,7 @@ func main() {
 	// Initialize services
 	userManager := services.NewUserManager(userRepo)
 	containerManager := services.NewContainerManager(containerRepo)
-	invoiceManager := services.NewInvoiceManager(invoiceRepo)
+	invoiceManager := services.NewInvoiceManager(invoiceRepo, userManager)
 
 	// Initialize controllers
 	userController := controllers.NewUserController(userManager, containerManager)
