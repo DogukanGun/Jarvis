@@ -48,14 +48,17 @@ func main() {
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(database.GetDatabase())
 	containerRepo := repository.NewContainerRepository(database.GetDatabase())
+	invoiceRepo := repository.NewInvoiceRepository(database.GetDatabase())
 
 	// Initialize services
 	userManager := services.NewUserManager(userRepo)
 	containerManager := services.NewContainerManager(containerRepo)
+	invoiceManager := services.NewInvoiceManager(invoiceRepo, userManager)
 
 	// Initialize controllers
 	userController := controllers.NewUserController(userManager, containerManager)
 	containerController := controllers.NewContainerController(containerManager, userManager)
+	invoiceController := controllers.NewInvoiceController(invoiceManager)
 
 	// Initialize auth middleware
 	authMiddleware := controllers.AuthMiddleware(userManager)
@@ -103,6 +106,20 @@ func main() {
 			r.Post("/containers/start", containerController.StartContainer)
 			r.Post("/containers/stop", containerController.StopContainer)
 			r.Get("/containers/{containerID}", containerController.GetContainerByID)
+
+			// Invoice routes
+			r.Post("/invoices", invoiceController.CreateInvoice)
+			r.Get("/invoices", invoiceController.GetUserInvoices)
+			r.Get("/invoices/unpaid", invoiceController.GetUserUnpaidInvoices)
+			r.Get("/invoices/{invoiceID}", invoiceController.GetInvoiceByID)
+			r.Put("/invoices/{invoiceID}", invoiceController.UpdateInvoice)
+			r.Delete("/invoices/{invoiceID}", invoiceController.DeleteInvoice)
+			r.Post("/invoices/{invoiceID}/check-payment", invoiceController.CheckPaymentAndUpdate)
+			r.Post("/invoices/generate", invoiceController.GenerateMonthlyInvoice)
+			r.Get("/invoices/stats", invoiceController.GetInvoiceStatistics)
+			r.Get("/invoices/user/{userID}", invoiceController.GetUserInvoicesByUserID)
+			r.Get("/invoices/all/unpaid", invoiceController.GetAllUnpaidInvoices)
+			r.Get("/invoices/all/paid", invoiceController.GetAllPaidInvoices)
 		})
 	})
 
@@ -128,6 +145,15 @@ func main() {
 	fmt.Printf("  POST /api/v1/containers/start       - Start user's container\n")
 	fmt.Printf("  POST /api/v1/containers/stop        - Stop user's container\n")
 	fmt.Printf("  GET  /api/v1/containers/{id}        - Get container by ID (own only)\n")
+	fmt.Printf("  POST /api/v1/invoices              - Create new invoice\n")
+	fmt.Printf("  GET  /api/v1/invoices              - Get user's invoices\n")
+	fmt.Printf("  GET  /api/v1/invoices/unpaid       - Get user's unpaid invoices\n")
+	fmt.Printf("  GET  /api/v1/invoices/{id}         - Get invoice by ID\n")
+	fmt.Printf("  PUT  /api/v1/invoices/{id}         - Update invoice\n")
+	fmt.Printf("  DELETE /api/v1/invoices/{id}       - Delete invoice\n")
+	fmt.Printf("  POST /api/v1/invoices/{id}/check-payment - Check payment status\n")
+	fmt.Printf("  POST /api/v1/invoices/generate     - Generate monthly invoice\n")
+	fmt.Printf("  GET  /api/v1/invoices/stats        - Get invoice statistics\n")
 
 	log.Fatal(http.ListenAndServe(":"+port, r))
 }

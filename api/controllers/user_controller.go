@@ -29,9 +29,10 @@ func NewUserController(userManager *services.UserManager, containerManager *serv
 
 // RegisterRequest represents user registration data
 type RegisterRequest struct {
-	Username string `json:"username" validate:"required,min=3,max=50"`
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=6"`
+	Username      string `json:"username" validate:"required,min=3,max=50"`
+	Email         string `json:"email" validate:"required,email"`
+	Password      string `json:"password" validate:"required,min=6"`
+	WalletAddress string `json:"wallet_address"`
 }
 
 // RegisterResponse represents user registration response
@@ -166,6 +167,10 @@ func (uc *UserController) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		sendError(w, "Password must be at least 6 characters long", http.StatusBadRequest)
 		return
 	}
+	if req.WalletAddress == "" {
+		sendError(w, "WalletAddress is required", http.StatusBadRequest)
+		return
+	}
 
 	// Check if user already exists
 	if uc.userManager.UserExists(req.Username) {
@@ -191,11 +196,12 @@ func (uc *UserController) RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 	// Create user
 	user := &data.User{
-		ID:        userID,
-		Username:  req.Username,
-		Email:     req.Email,
-		Password:  hashedPassword,
-		CreatedAt: time.Now(),
+		ID:            userID,
+		Username:      req.Username,
+		Email:         req.Email,
+		Password:      hashedPassword,
+		WalletAddress: req.WalletAddress,
+		CreatedAt:     time.Now(),
 	}
 
 	// Create Docker container for the user's agent
