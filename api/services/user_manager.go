@@ -40,6 +40,12 @@ func (um *UserManager) GetUserByEmail(email string) (*data.User, error) {
 	return um.repository.GetByEmail(ctx, email)
 }
 
+// GetUserByWalletAddress retrieves a user by wallet address
+func (um *UserManager) GetUserByWalletAddress(walletAddress string) (*data.User, error) {
+	ctx := context.Background()
+	return um.repository.GetByWalletAddress(ctx, walletAddress)
+}
+
 // GetUserByContainerID retrieves a user by container ID
 func (um *UserManager) GetUserByContainerID(containerID string) (*data.User, error) {
 	ctx := context.Background()

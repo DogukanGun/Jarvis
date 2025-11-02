@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
@@ -25,6 +26,11 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*d
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*data.User, error) {
 	filter := bson.M{"email": email}
+	return r.FindOneBy(ctx, filter)
+}
+
+func (r *UserRepository) GetByWalletAddress(ctx context.Context, walletAddress string) (*data.User, error) {
+	filter := bson.M{"wallet_address": walletAddress}
 	return r.FindOneBy(ctx, filter)
 }
 

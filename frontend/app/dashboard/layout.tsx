@@ -27,23 +27,18 @@ import {
 import { 
   Sparkles, 
   MessageSquare, 
-  Bell, 
   Plus,
   ChevronRight,
-  X,
   Wallet,
   Copy,
   ExternalLink,
-  Play,
-  Square,
   Loader2,
   User,
-  Settings,
   LogOut
 } from "lucide-react";
 import { usePathname, useRouter } from 'next/navigation';
-import { apiClient, saveContainerInfo } from "@/lib/api-client";
-import type { Container, AuthResponse } from "@/lib/api-client";
+import { apiClient, isAuthenticated } from "@/lib/api-client";
+import type { AuthResponse } from "@/lib/api-client";
 import { toast } from "sonner";
 
 export default function DashboardLayout({
@@ -54,32 +49,35 @@ export default function DashboardLayout({
   const router = useRouter();
   const [walletAddress] = useState('0x742d...92a8');
   const [walletBalance] = useState('9.99');
-  const [container, setContainer] = useState<Container | null>(null);
-  const [containerLoading, setContainerLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<AuthResponse | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
-  const [notifications, setNotifications] = useState([
-    { id: 1, type: 'success', title: 'Agent Started', message: 'Your agent is now running', unread: true },
-    { id: 2, type: 'info', title: 'New Feature', message: 'Voice input is now available', unread: true },
-    { id: 3, type: 'warning', title: 'Low Balance', message: 'Your balance is running low', unread: false },
-    { id: 4, type: 'success', title: 'Task Completed', message: 'Smart contract deployed successfully', unread: false },
-  ]);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   
   const pathname = usePathname();
-  
-  const unreadCount = notifications.filter(n => n.unread).length;
 
-  // Initialize container and user profile on mount
+  // Check authentication on mount
   useEffect(() => {
+    const checkAuth = () => {
+      if (!isAuthenticated()) {
+        toast.error('Please login to access dashboard');
+        router.push('/');
+        return false;
+      }
+      setIsAuthChecking(false);
+      return true;
+    };
+
+    if (!checkAuth()) {
+      return;
+    }
+  }, [router]);
+
+  // Initialize user profile on mount
+  useEffect(() => {
+    if (isAuthChecking) return;
+
     const initData = async () => {
       try {
-        // Fetch container status
-        setContainerLoading(true);
-        const status = await apiClient.containers.getStatus();
-        setContainer(status);
-        saveContainerInfo(status);
-        setContainerLoading(false);
-        
         // Fetch user profile
         setProfileLoading(true);
         const profile = await apiClient.users.getProfile();
@@ -91,12 +89,19 @@ export default function DashboardLayout({
         setProfileLoading(false);
         
         toast.success('Welcome back!', {
-          description: `Agent is ${status.is_running ? 'running' : 'stopped'}`,
+          description: 'Your dashboard is ready',
         });
       } catch (error) {
         console.error('Failed to initialize dashboard:', error);
-        setContainerLoading(false);
         setProfileLoading(false);
+        
+        // If profile fetch fails, user might not be authenticated
+        if (error instanceof Error && error.message.includes('401')) {
+          toast.error('Session expired, please login again');
+          router.push('/');
+          return;
+        }
+        
         toast.error('Failed to load dashboard data', {
           description: error instanceof Error ? error.message : 'Please try refreshing the page',
         });
@@ -104,69 +109,25 @@ export default function DashboardLayout({
     };
 
     initData();
-  }, []);
-
-  const handleStartContainer = async () => {
-    if (!container) return;
-    try {
-      setContainerLoading(true);
-      await apiClient.containers.start();
-      const status = await apiClient.containers.getStatus();
-      setContainer(status);
-      saveContainerInfo(status);
-      toast.success('Agent started successfully', {
-        description: 'Your agent is now ready to use',
-      });
-    } catch (error) {
-      console.error('Failed to start container:', error);
-      toast.error('Failed to start agent', {
-        description: error instanceof Error ? error.message : 'Please try again',
-      });
-    } finally {
-      setContainerLoading(false);
-    }
-  };
-
-  const handleStopContainer = async () => {
-    if (!container) return;
-    try {
-      setContainerLoading(true);
-      await apiClient.containers.stop();
-      const status = await apiClient.containers.getStatus();
-      setContainer(status);
-      saveContainerInfo(status);
-      toast.info('Agent stopped', {
-        description: 'Your agent has been stopped',
-      });
-    } catch (error) {
-      console.error('Failed to stop container:', error);
-      toast.error('Failed to stop agent', {
-        description: error instanceof Error ? error.message : 'Please try again',
-      });
-    } finally {
-      setContainerLoading(false);
-    }
-  };
-  
-  const markAsRead = (id: number) => {
-    setNotifications(notifications.map(n => 
-      n.id === id ? { ...n, unread: false } : n
-    ));
-  };
-  
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, unread: false })));
-  };
-  
-  const removeNotification = (id: number) => {
-    setNotifications(notifications.filter(n => n.id !== id));
-  };
+  }, [isAuthChecking, router]);
 
   const getBreadcrumb = () => {
     const path = pathname.split('/').filter(Boolean);
     if (path.length === 1) return 'Chat';
     return path[path.length - 1].charAt(0).toUpperCase() + path[path.length - 1].slice(1);
   };
+
+  // Show loading state while checking authentication
+  if (isAuthChecking) {
+    return (
+      <div className="flex h-screen w-full bg-[#0F172A] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 text-[#F7931A] animate-spin" />
+          <p className="text-white/60">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   
 
@@ -221,67 +182,6 @@ export default function DashboardLayout({
           </SidebarHeader>
 
           <SidebarContent className="bg-[#1e1b4b]">
-            {/* Agent Status */}
-            <SidebarGroup className="bg-[#1e1b4b]">
-              <SidebarGroupLabel className="text-xs font-semibold text-white/60 px-4 bg-[#1e1b4b]">
-                AGENT STATUS
-              </SidebarGroupLabel>
-              <SidebarGroupContent className="bg-[#1e1b4b] px-4 pb-3">
-                <div className="bg-white/5 rounded-lg p-3 space-y-2">
-                  {containerLoading ? (
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 text-[#F7931A] animate-spin" />
-                      <span className="text-sm text-white/60">Initializing...</span>
-                    </div>
-                  ) : container ? (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-white/40">Status</span>
-                        <div className="flex items-center gap-1.5">
-                          <div className={`w-1.5 h-1.5 rounded-full ${
-                            container.is_running ? 'bg-green-400' : 'bg-red-400'
-                          }`}></div>
-                          <span className="text-xs font-medium text-white/80 capitalize">
-                            {container.is_running ? 'Running' : 'Stopped'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-white/40">Port</span>
-                        <span className="text-xs font-mono text-white/60">{container.port}</span>
-                      </div>
-                      <div className="flex gap-2 pt-1">
-                        {container.is_running ? (
-                          <Button
-                            onClick={handleStopContainer}
-                            disabled={containerLoading}
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 h-7 text-xs bg-red-500/10 border-red-500/20 text-red-300 hover:bg-red-500/20"
-                          >
-                            <Square className="w-3 h-3 mr-1" />
-                            Stop
-                          </Button>
-                        ) : (
-                          <Button
-                            onClick={handleStartContainer}
-                            disabled={containerLoading}
-                            size="sm"
-                            className="flex-1 h-7 text-xs bg-green-500/10 border-green-500/20 text-green-300 hover:bg-green-500/20"
-                          >
-                            <Play className="w-3 h-3 mr-1" />
-                            Start
-                          </Button>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-xs text-white/40 text-center">No agent container</div>
-                  )}
-                </div>
-              </SidebarGroupContent>
-            </SidebarGroup>
-           
             {/* Recent Conversations */}
             <SidebarGroup className="bg-[#1e1b4b]">
               <SidebarGroupLabel className="text-xs font-semibold text-white/60 px-4 bg-[#1e1b4b]">
@@ -377,77 +277,6 @@ export default function DashboardLayout({
               </div>
             </div>
 
-            {/* Notifications Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="relative p-2 hover:bg-white/10 rounded-lg transition-colors">
-                  <Bell className="w-5 h-5 text-white/60" />
-                  {unreadCount > 0 && (
-                    <div className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-                      <span className="text-[10px] font-bold text-white">{unreadCount}</span>
-                    </div>
-                  )}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80 bg-[#1e1b4b] border-white/10">
-                <DropdownMenuLabel className="flex items-center justify-between">
-                  <span className="text-white">Notifications</span>
-                  {unreadCount > 0 && (
-                    <button 
-                      onClick={markAllAsRead}
-                      className="text-xs text-[#F7931A] hover:text-[#FCD34D] transition-colors"
-                    >
-                      Mark all as read
-                    </button>
-                  )}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-white/10" />
-                
-                {notifications.length === 0 ? (
-                  <div className="px-2 py-8 text-center text-white/40 text-sm">
-                    No notifications
-                  </div>
-                ) : (
-                  <div className="max-h-[400px] overflow-y-auto">
-                    {notifications.map((notification) => (
-                      <DropdownMenuItem 
-                        key={notification.id}
-                        className="flex items-start gap-3 px-3 py-3 cursor-pointer focus:bg-white/5 hover:bg-white/5"
-                        onClick={() => markAsRead(notification.id)}
-                      >
-                        <div className={`shrink-0 w-2 h-2 rounded-full mt-1.5 ${
-                          notification.type === 'success' ? 'bg-green-500' :
-                          notification.type === 'warning' ? 'bg-yellow-500' :
-                          notification.type === 'error' ? 'bg-red-500' :
-                          'bg-blue-500'
-                        } ${notification.unread ? 'animate-pulse' : 'opacity-50'}`}></div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className={`text-sm font-medium ${notification.unread ? 'text-white' : 'text-white/60'}`}>
-                              {notification.title}
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeNotification(notification.id);
-                              }}
-                              className="shrink-0 p-1 hover:bg-white/10 rounded transition-colors"
-                            >
-                              <X className="w-3 h-3 text-white/40 hover:text-white/80" />
-                            </button>
-                          </div>
-                          <p className={`text-xs mt-1 ${notification.unread ? 'text-white/60' : 'text-white/40'}`}>
-                            {notification.message}
-                          </p>
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
-                  </div>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
             {/* User Profile Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -480,20 +309,24 @@ export default function DashboardLayout({
                   <User className="w-4 h-4 mr-2" />
                   Profile
                 </DropdownMenuItem>
-                <DropdownMenuItem 
-                  className="text-white/80 hover:bg-white/5 cursor-pointer"
-                  onClick={() => router.push('/dashboard/settings')}
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Settings
-                </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-white/10" />
                 <DropdownMenuItem 
                   className="text-red-400 hover:bg-red-500/10 cursor-pointer"
-                  onClick={() => {
-                    apiClient.auth.logout();
-                    toast.success('Logged out successfully');
-                    router.push('/login');
+                  onClick={async () => {
+                    try {
+                      // Wait for logout to complete
+                      await apiClient.auth.logout();
+                      
+                      toast.success('Logged out successfully');
+                      
+                      // Navigate to landing page after logout completes
+                      router.push('/');
+                    } catch (error) {
+                      console.error('Logout error:', error);
+                      toast.error('Logout failed', {
+                        description: 'Please try again',
+                      });
+                    }
                   }}
                 >
                   <LogOut className="w-4 h-4 mr-2" />

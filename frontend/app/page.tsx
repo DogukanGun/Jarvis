@@ -1,12 +1,13 @@
-
-
 'use client';
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Wallet, ArrowRight, Zap, Shield, Code2, Globe, DollarSign, CheckCircle2, TrendingUp, Users, Rocket } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const router = useRouter();
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-linear-to-br from-[#0F172A] via-[#1e1b4b] to-[#0F172A]">
       {/* Animated background elements */}
@@ -28,13 +29,21 @@ export default function Home() {
             </div>
             <span className="text-2xl font-bold text-white tracking-tight">JARVIS</span>
           </div>
-          <Button 
-            variant="outline" 
-            className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white hover:border-white/30 backdrop-blur-sm inline-flex items-center gap-2"
-          >
-            <Wallet className="w-4 h-4" />
-            <span>Connect Wallet</span>
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/login')}
+              className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white hover:border-white/30 backdrop-blur-sm"
+            >
+              Sign In
+            </Button>
+            <Button 
+              onClick={() => router.push('/signup')}
+              className="bg-linear-to-r from-[#F7931A] to-[#F97316] hover:from-[#FCD34D] hover:to-[#F7931A] text-white font-semibold border-0"
+            >
+              Sign Up
+            </Button>
+          </div>
         </nav>
 
         {/* Hero Content */}
@@ -77,6 +86,7 @@ export default function Home() {
           >
             <Button 
               size="lg"
+              onClick={() => router.push('/signup')}
               className="bg-linear-to-r from-[#F7931A] to-[#F97316] hover:from-[#FCD34D] hover:to-[#F7931A] text-white font-bold text-lg px-8 py-6 shadow-2xl shadow-[#F7931A]/30 hover:shadow-[#F7931A]/50 transition-all hover:scale-105 h-auto inline-flex items-center gap-2 border-0"
             >
               <span>Get Started</span>
@@ -85,9 +95,10 @@ export default function Home() {
             <Button 
               size="lg"
               variant="outline"
+              onClick={() => router.push('/login')}
               className="border-2 border-white/30 bg-transparent text-white hover:bg-white/10 hover:border-white/40 font-semibold text-lg px-8 py-6 backdrop-blur-sm h-auto"
             >
-              View Demo
+              Login
             </Button>
           </div>
 

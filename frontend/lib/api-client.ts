@@ -13,6 +13,16 @@ export interface LoginData {
   password: string;
 }
 
+export interface WalletAuthData {
+  wallet_address: string;
+  signature: string;
+  message: string;
+  full_name?: string;
+  email?: string;
+  password?: string;
+  btc_tx_id?: string;
+}
+
 export interface AuthResponse {
   user_id: string;
   username: string;
@@ -42,6 +52,19 @@ export interface ChatResponse {
   processed_at: string;
   user_id: string;
   container_id: string;
+}
+
+export interface Invoice {
+  id: string;
+  user_id: string;
+  month: number;
+  year: number;
+  amount: number;
+  transaction_hash: string;
+  is_paid: boolean;
+  created_at: string;
+  last_active: string;
+  paid_at?: string;
 }
 
 // Helper function to get auth token
@@ -85,11 +108,39 @@ export const apiClient = {
       return handleResponse<AuthResponse>(response);
     },
 
-    logout: () => {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth-token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('container-info');
+    walletAuth: async (data: WalletAuthData): Promise<AuthResponse> => {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/wallet`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      return handleResponse<AuthResponse>(response);
+    },
+
+    logout: async (): Promise<void> => {
+      try {
+        const token = getAuthToken();
+        if (token) {
+          // Call backend logout endpoint
+          await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+        }
+      } catch (error) {
+        console.error('Backend logout failed:', error);
+        // Continue with local cleanup even if backend fails
+      } finally {
+        // Always clean up local storage
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth-token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('container-info');
+        }
       }
     },
   },
@@ -172,6 +223,42 @@ export const apiClient = {
         body: JSON.stringify(data),
       });
       return handleResponse<AuthResponse>(response);
+    },
+  },
+
+  // Invoice endpoints
+  invoices: {
+    getAll: async (): Promise<Invoice[]> => {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/api/v1/invoices`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      return handleResponse<Invoice[]>(response);
+    },
+
+    getUnpaid: async (): Promise<Invoice[]> => {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/api/v1/invoices/unpaid`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      return handleResponse<Invoice[]>(response);
+    },
+
+    checkPayment: async (invoiceId: string): Promise<Invoice> => {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/api/v1/invoices/${invoiceId}/check-payment`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      return handleResponse<Invoice>(response);
     },
   },
 };

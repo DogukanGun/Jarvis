@@ -59,6 +59,7 @@ func main() {
 	userController := controllers.NewUserController(userManager, containerManager)
 	containerController := controllers.NewContainerController(containerManager, userManager)
 	invoiceController := controllers.NewInvoiceController(invoiceManager)
+	authController := controllers.NewAuthController(userManager, containerManager)
 
 	// Initialize auth middleware
 	authMiddleware := controllers.AuthMiddleware(userManager)
@@ -87,12 +88,18 @@ func main() {
 			// User registration and login
 			r.Post("/users/register", userController.RegisterUser)
 			r.Post("/users/login", userController.LoginUser)
+			
+			// Wallet authentication
+			r.Post("/auth/wallet", authController.WalletAuth)
 		})
 
 		// Protected routes (authentication required)
 		r.Group(func(r chi.Router) {
 			// Apply authentication middleware
 			r.Use(authMiddleware)
+
+			// Auth routes
+			r.Post("/auth/logout", authController.Logout)
 
 			// User routes
 			r.Get("/users/profile", userController.GetUserProfile)
@@ -134,8 +141,10 @@ func main() {
 	fmt.Printf("  GET  /health                        - Health check\n")
 	fmt.Printf("  POST /api/v1/users/register         - Register new user and create agent container\n")
 	fmt.Printf("  POST /api/v1/users/login            - Login with email and password\n")
+	fmt.Printf("  POST /api/v1/auth/wallet            - Wallet authentication (login/signup)\n")
 	fmt.Printf("  GET  /swagger/*                     - Swagger API documentation\n")
 	fmt.Printf("\nProtected endpoints (require Bearer token):\n")
+	fmt.Printf("  POST /api/v1/auth/logout            - Logout user\n")
 	fmt.Printf("  GET  /api/v1/users/profile          - Get authenticated user's profile\n")
 	fmt.Printf("  GET  /api/v1/users/{userID}         - Get user by ID (own only)\n")
 	fmt.Printf("  PUT  /api/v1/users/{userID}         - Update user (own only)\n")

@@ -1,0 +1,22 @@
+services:
+  agent-a46b9bb7-a657-4171-971c-f3010956766a:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jarvis-user-a46b9bb7-a657-4171-971c-f3010956766a
+    ports:
+      - "9000:8080"
+    environment:
+      - OPENAI_API_KEY=
+      - AGENT_MODE=http
+      - USER_ID=a46b9bb7-a657-4171-971c-f3010956766a
+      - CONTAINER_NAME=jarvis-user-a46b9bb7-a657-4171-971c-f3010956766a
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=jarvispassword
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
