@@ -54,8 +54,8 @@ services:
   # Jarvis API Service
   jarvis-api:
     build:
-      context: ../api
-      dockerfile: Dockerfile
+      context: ../../api
+      dockerfile: ../../api/Dockerfile
     container_name: jarvis-api
     ports:
       - "8080:8080"

@@ -7,13 +7,13 @@ WORKDIR /app
 RUN apk add --no-cache git
 
 # Copy go mod and sum files from agent directory
-COPY go.mod go.sum ./
+COPY ../go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
 
 # Copy agent source code
-COPY . .
+COPY .. .
 
 # Build the agent HTTP server
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o agent-http .

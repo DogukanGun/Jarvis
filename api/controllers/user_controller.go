@@ -8,6 +8,8 @@ import (
 	"jarvis/api/data"
 	"jarvis/api/services"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,12 +20,14 @@ import (
 type UserController struct {
 	userManager      *services.UserManager
 	containerManager *services.ContainerManager
+	invoiceManager   *services.InvoiceManager
 }
 
-func NewUserController(userManager *services.UserManager, containerManager *services.ContainerManager) *UserController {
+func NewUserController(userManager *services.UserManager, containerManager *services.ContainerManager, invoiceManager *services.InvoiceManager) *UserController {
 	return &UserController{
 		userManager:      userManager,
 		containerManager: containerManager,
+		invoiceManager:   invoiceManager,
 	}
 }
 
@@ -42,6 +46,7 @@ type RegisterResponse struct {
 	Email       string    `json:"email"`
 	ContainerID string    `json:"container_id"`
 	Token       string    `json:"token"`
+	InvoiceID   string    `json:"invoice_id"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
@@ -225,12 +230,38 @@ func (uc *UserController) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//Generate invoice
+	today := time.Now()
+	subsFee := os.Getenv("SUBS_FEE")
+	if subsFee == "" {
+		//TODO log the error locally
+		sendError(w, "There is an internal problem, try later", http.StatusBadRequest)
+		return
+	}
+	subsFeeAsFloat, err := strconv.ParseFloat(subsFee, 64)
+	if err != nil {
+		//TODO log the error locally
+		sendError(w, "There is an internal problem, try later", http.StatusBadRequest)
+		return
+	}
+	invoice, err := uc.invoiceManager.CreateInvoice(user.ID, int(today.Month()), today.Year(), subsFeeAsFloat, "")
+	if err != nil {
+		//TODO log the error locally
+		sendError(w, "Failed to create invoice: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if invoice == nil {
+		//TODO log the error locally
+		sendError(w, "Failed to create invoice: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 	response := RegisterResponse{
 		UserID:      userID,
 		Username:    req.Username,
 		Email:       req.Email,
 		ContainerID: containerID,
 		Token:       token,
+		InvoiceID:   invoice.ID,
 		CreatedAt:   user.CreatedAt,
 	}
 

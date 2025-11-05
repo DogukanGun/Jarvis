@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"jarvis/agent/db"
+	jarvisTools2 "jarvis/agent/tools"
 	"time"
 
 	"github.com/tmc/langchaingo/agents"
 	"github.com/tmc/langchaingo/llms/openai"
 	"github.com/tmc/langchaingo/tools"
 	"github.com/tmc/langchaingo/tools/wikipedia"
-	jarvisTools "jarvis/agent/tools"
 )
 
 // JarvisAgent represents a Jarvis AI agent instance
@@ -58,7 +58,7 @@ func NewJarvisAgent(config AgentConfig) (*JarvisAgent, error) {
 	wikipediaTool := wikipedia.New("Jarvis-AI-Agent/1.0 (https://github.com/user/jarvis)")
 
 	// Get web tools (includes wrapped scraper)
-	webTools, err := jarvisTools.GetWebTools()
+	webTools, err := jarvisTools2.GetWebTools()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create web tools: %v", err)
 	}
@@ -66,10 +66,10 @@ func NewJarvisAgent(config AgentConfig) (*JarvisAgent, error) {
 	var allTools []tools.Tool
 
 	// Add custom tools
-	allTools = append(allTools, jarvisTools.GetFileTools()...)
-	allTools = append(allTools, jarvisTools.GetExecutionTools()...)
-	allTools = append(allTools, jarvisTools.GetEnvironmentTools()...)
-	allTools = append(allTools, jarvisTools.GetCommunicationTools()...)
+	allTools = append(allTools, jarvisTools2.GetFileTools()...)
+	allTools = append(allTools, jarvisTools2.GetExecutionTools()...)
+	allTools = append(allTools, jarvisTools2.GetEnvironmentTools()...)
+	allTools = append(allTools, jarvisTools2.GetCommunicationTools()...)
 
 	// Add web tools
 	allTools = append(allTools, webTools...)

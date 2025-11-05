@@ -12,13 +12,15 @@ import (
 
 type ContainerController struct {
 	containerManager *services.ContainerManager
+	invoiceManager   *services.InvoiceManager
 	userManager      *services.UserManager
 }
 
-func NewContainerController(containerManager *services.ContainerManager, userManager *services.UserManager) *ContainerController {
+func NewContainerController(containerManager *services.ContainerManager, userManager *services.UserManager, invoiceManager *services.InvoiceManager) *ContainerController {
 	return &ContainerController{
 		containerManager: containerManager,
 		userManager:      userManager,
+		invoiceManager:   invoiceManager,
 	}
 }
 
@@ -87,6 +89,19 @@ func (cc *ContainerController) SendMessage(w http.ResponseWriter, r *http.Reques
 
 	if user.ContainerID == "" {
 		sendError(w, "No container found for user", http.StatusNotFound)
+		return
+	}
+
+	//Check if user paid his/her invoice
+	invoices, err := cc.invoiceManager.GetUserUnpaidInvoices(authUser.UserID)
+	if err != nil {
+		//TODO log locally
+		sendError(w, "Invoice not found", http.StatusNotFound)
+		return
+	}
+	if len(invoices) > 0 {
+		//TODO log locally
+		sendError(w, "There are unpaid invoices", http.StatusNotFound)
 		return
 	}
 

@@ -56,8 +56,8 @@ func main() {
 	invoiceManager := services.NewInvoiceManager(invoiceRepo, userManager)
 
 	// Initialize controllers
-	userController := controllers.NewUserController(userManager, containerManager)
-	containerController := controllers.NewContainerController(containerManager, userManager)
+	userController := controllers.NewUserController(userManager, containerManager, invoiceManager)
+	containerController := controllers.NewContainerController(containerManager, userManager, invoiceManager)
 	invoiceController := controllers.NewInvoiceController(invoiceManager)
 
 	// Initialize auth middleware
@@ -108,7 +108,6 @@ func main() {
 			r.Get("/containers/{containerID}", containerController.GetContainerByID)
 
 			// Invoice routes
-			r.Post("/invoices", invoiceController.CreateInvoice)
 			r.Get("/invoices", invoiceController.GetUserInvoices)
 			r.Get("/invoices/unpaid", invoiceController.GetUserUnpaidInvoices)
 			r.Get("/invoices/{invoiceID}", invoiceController.GetInvoiceByID)

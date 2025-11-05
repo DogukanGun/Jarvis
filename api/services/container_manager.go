@@ -84,6 +84,8 @@ func (cm *ContainerManager) CreateContainer(userID string) (string, error) {
 	// Wait a moment for container to start
 	time.Sleep(3 * time.Second)
 
+	//TODO send email send message to
+
 	return containerName, nil
 }
 
@@ -101,7 +103,7 @@ func (cm *ContainerManager) SendMessage(containerID, message string) (string, er
 	}
 
 	// Update last used time
-	if err := cm.repository.UpdateLastUsed(ctx, containerID); err != nil {
+	if err := cm.repository.UpdateLastActive(ctx, containerID); err != nil {
 		// Log error but don't fail the message sending
 		fmt.Printf("Warning: failed to update last used time: %v\n", err)
 	}
