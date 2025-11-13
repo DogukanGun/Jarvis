@@ -2,10 +2,17 @@
 
 # Jarvis API Build and PM2 Start Script
 
+# Get the directory where this script is located (api folder)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get the parent directory (project root)
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+echo "Script location: $SCRIPT_DIR"
+echo "Project root: $PROJECT_ROOT"
 echo "🔨 Building Jarvis API..."
 
 # Build the Go application
-go build -o jarvis-api .
+go build -o "$PROJECT_ROOT/jarvis-api" .
 
 if [ $? -ne 0 ]; then
     echo "Build failed"
@@ -26,7 +33,8 @@ echo "Starting Jarvis API with PM2..."
 pm2 stop jarvis-api 2>/dev/null || true
 pm2 delete jarvis-api 2>/dev/null || true
 
-# Start the application with PM2
+# Start the application with PM2 from the project root
+cd "$PROJECT_ROOT"
 pm2 start ./jarvis-api \
     --name "jarvis-api" \
     --env MONGODB_URI="$MONGODB_URI" \

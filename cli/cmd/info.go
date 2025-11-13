@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"jarvis/agent"
 )
 
 var infoCmd = &cobra.Command{
@@ -50,25 +49,48 @@ func init() {
 }
 
 func showCapabilities(cmd *cobra.Command, args []string) error {
-	config, err := getAgentConfig()
-	if err != nil {
-		return fmt.Errorf("configuration error: %v", err)
-	}
-
-	jarvisAgent, err := agent.NewJarvisAgent(agent.AgentConfig{
-		UserID:      config["user_id"],
-		OpenAIModel: config["openai_model"],
-		OpenAIKey:   config["openai_key"],
-	})
-	if err != nil {
-		return fmt.Errorf("failed to initialize agent: %v", err)
-	}
-
-	capabilities := jarvisAgent.GetCapabilities()
-
 	fmt.Println("Jarvis AI Agent Capabilities")
 	fmt.Println("============================")
 	fmt.Println()
+
+	capabilities := map[string][]string{
+		"File Operations": {
+			"Read file contents",
+			"Write to files",
+			"List directory contents",
+			"Delete files",
+			"Copy files",
+			"Move files",
+		},
+		"Code Execution": {
+			"Execute Python scripts",
+			"Run Go programs",
+			"Execute JavaScript",
+			"Run shell commands",
+			"Compile and build projects",
+		},
+		"Environment Management": {
+			"Install packages (pip, npm, go get)",
+			"Check versions",
+			"Manage dependencies",
+			"Environment variable handling",
+		},
+		"Git Operations": {
+			"Git status and diff",
+			"Commit changes",
+			"Create pull requests",
+			"Branch management",
+		},
+		"Web Research": {
+			"Wikipedia search",
+			"Web scraping",
+			"URL content fetching",
+		},
+		"Communication": {
+			"Send email notifications",
+			"Kafka messaging",
+		},
+	}
 
 	for category, items := range capabilities {
 		fmt.Printf("🔧 %s:\n", category)
@@ -82,21 +104,21 @@ func showCapabilities(cmd *cobra.Command, args []string) error {
 }
 
 func showTools(cmd *cobra.Command, args []string) error {
-	config, err := getAgentConfig()
-	if err != nil {
-		return fmt.Errorf("configuration error: %v", err)
+	tools := []string{
+		"file_tool - File operations (read, write, list, delete)",
+		"bash_tool - Execute shell commands and scripts",
+		"python_tool - Execute Python code",
+		"go_tool - Execute Go code",
+		"javascript_tool - Execute JavaScript code",
+		"git_tool - Git operations and version control",
+		"web_tool - Web scraping and content fetching",
+		"wikipedia_tool - Wikipedia search and content retrieval",
+		"package_tool - Package management (pip, npm, go get)",
+		"email_tool - Send email notifications",
+		"kafka_tool - Kafka messaging operations",
+		"environment_tool - Environment variable management",
+		"docker_tool - Docker container operations",
 	}
-
-	jarvisAgent, err := agent.NewJarvisAgent(agent.AgentConfig{
-		UserID:      config["user_id"],
-		OpenAIModel: config["openai_model"],
-		OpenAIKey:   config["openai_key"],
-	})
-	if err != nil {
-		return fmt.Errorf("failed to initialize agent: %v", err)
-	}
-
-	tools := jarvisAgent.GetAvailableTools()
 
 	fmt.Println("Available Tools")
 	fmt.Println("===============")

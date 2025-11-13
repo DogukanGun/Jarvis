@@ -47,6 +47,11 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
+// GetRootCommand returns the root command for external access
+func GetRootCommand() *cobra.Command {
+	return rootCmd
+}
+
 func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&openaiKey, "openai-key", "", "OpenAI API key (can also use OPENAI_API_KEY env var)")
@@ -62,8 +67,6 @@ func init() {
 	}
 
 	// Add subcommands
-	rootCmd.AddCommand(chatCmd)
-	rootCmd.AddCommand(askCmd)
 	rootCmd.AddCommand(infoCmd)
 }
 

@@ -30,6 +30,64 @@ services:
       timeout: 10s
       retries: 5
 
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: jarvis-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  # Kafka Message Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: jarvis-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    depends_on:
+      - zookeeper
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Ollama LLM Service (shared by multiple agents)
+  ollama:
+    build:
+      context: ./ollama
+      dockerfile: Dockerfile
+    container_name: ${CONTAINER_NAME:-jarvis-ollama}
+    ports:
+      - "11434:11434"
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "sh", "-c", "command -v curl >/dev/null 2>&1 && curl -s http://localhost:11434/api/tags | grep -q llama3.2 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 120s
+
   # PostgreSQL Database (existing)
   postgres:
     image: postgres:15-alpine
@@ -54,27 +112,108 @@ services:
   # Jarvis API Service
   jarvis-api:
     build:
-      context: ../../api
-      dockerfile: ../../api/Dockerfile
+      context: ../api
+      dockerfile: Dockerfile
     container_name: jarvis-api
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=postgres://jarvis:jarvispassword@postgres:5432/jarvis?sslmode=disable
+      - DATABASE_URL=postgres://jarvis:jarvis
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USER=neo4j
       - NEO4J_PASSWORD=jarvispassword
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_KEY=sk-proj-n38C0NhfJXn2geVhKorpdHHzVXDhrkH0YaYeJ_N37umP5eQN04fk9N1BNCzmODXTiUyz4rJQsbT3BlbkFJs2imEoKITbQF_uyof9SLPD_XcKIDvdA6
+      - KAFKA_BROKERS=kafka:29092
     depends_on:
       postgres:
         condition: service_healthy
       neo4j:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     networks:
       - jarvis-network
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # For managing agent containers
+
+  # Jarvis General Agent Service
+  agent-general:
+    build:
+      context: .
+      dockerfile: ./general/Dockerfile
+    container_name: ${CONTAINER_NAME:-jarvis-agent-general}
+    ports:
+      - "${CLI_PORT:-8081}:8080"
+    environment:
+      - OPENAI_API_KEY=sk-proj-n38C0NhfJXn2geVhKorpdHHzVXDhrkH0YaYeJ_N37umP5eQN04fk9N1BNCzmODXTiUyz4rJQsbT3BlbkFJs2imEoKITbQF_uyof9SLPD_XcKIDvdA6
+      - AGENT_MODE=http
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=jarvispassword
+      - USER_ID=${USER_ID:-default}
+      - KAFKA_BROKERS=kafka:29092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  # Jarvis Router Agent Service
+  agent-router:
+    build:
+      context: .
+      dockerfile: ./router/Dockerfile
+    container_name: jarvis-agent-router
+    ports:
+      - "8083:8080"
+    environment:
+      - AGENT_MODE=http
+      - KAFKA_BROKERS=kafka:29092
+      - USER_ID=${USER_ID:-default}
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_TEST_MODEL=llama3.2
+    depends_on:
+      kafka:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  # Jarvis Coder Agent Service (placeholder for future implementation)
+  agent-coder:
+    build:
+      context: .
+      dockerfile: ./coder/Dockerfile
+    container_name: jarvis-agent-coder
+    ports:
+      - "8082:8080"
+    environment:
+      - OPENAI_API_KEY=sk-proj-n38C0NhfJXn2geVhKorpdHHzVXDhrkH0YaYeJ_N37umP5eQN04fk9N1BNCzmODXTiUyz4rJQsbT3BlbkFJs2imEoKITbQF_uyof9SLPD_XcKIDvdA6
+      - AGENT_MODE=http
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=jarvispassword
+      - KAFKA_BROKERS=kafka:29092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    profiles:
+      - coder  # This prevents it from starting by default until Dockerfile is created
 
 volumes:
   neo4j_data:
@@ -86,6 +225,8 @@ volumes:
   neo4j_plugins:
     driver: local
   postgres_data:
+    driver: local
+  ollama_data:
     driver: local
 
 networks:
