@@ -69,6 +69,36 @@ func (s *RouterServer) handleMessage(w http.ResponseWriter, r *http.Request) {
 
 func (s *RouterServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+
+	// Check if router service can actually process messages (model is ready)
+	if s.routerService == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "unhealthy",
+			"service": "router",
+			"reason":  "router service not initialized",
+		})
+		return
+	}
+
+	// Try a quick test to see if the LLM is responsive
+	// We can check this by testing if Ollama is accessible
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Simple check - if we can't process messages, we're not healthy
+	testMsg := "health check"
+	_, err := s.routerService.ProcessMessage(ctx, testMsg)
+	if err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "unhealthy",
+			"service": "router",
+			"reason":  "router not ready to process messages",
+		})
+		return
+	}
+
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "healthy",
 		"service": "router",

@@ -12,23 +12,20 @@ RUN curl -fsSL https://ollama.com/install.sh | sh
 # Expose Ollama port
 EXPOSE 11434
 
-# Create startup script that starts Ollama and pulls the model
-RUN echo '#!/bin/bash\n\
-echo "Starting Ollama server..."\n\
-ollama serve &\n\
-\n\
-echo "Waiting for Ollama to be ready..."\n\
-sleep 10\n\
-\n\
-echo "Pulling llama3.2 model..."\n\
-ollama pull llama3.2\n\
-\n\
-echo "Ollama setup complete. Keeping server running..."\n\
-wait\n\
-' > /start-ollama.sh && chmod +x /start-ollama.sh
-
 # Set environment variables
 ENV OLLAMA_HOST=0.0.0.0:11434
+
+# Start Ollama in background and pull the model during build
+RUN ollama serve & \
+    sleep 10 && \
+    ollama pull llama3.2 && \
+    pkill ollama
+
+# Create startup script that just starts Ollama (model already downloaded)
+RUN echo '#!/bin/bash\n\
+echo "Starting Ollama server with pre-downloaded models..."\n\
+ollama serve\n\
+' > /start-ollama.sh && chmod +x /start-ollama.sh
 
 # Run the startup script
 CMD ["/bin/bash", "/start-ollama.sh"]
