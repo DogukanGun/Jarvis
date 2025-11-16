@@ -68,11 +68,9 @@ services:
       timeout: 10s
       retries: 5
 
-  # Ollama LLM Service (shared by multiple agents)
+  # Ollama LLM Service (shared by multiple agents)  
   ollama:
-    build:
-      context: ./ollama
-      dockerfile: Dockerfile
+    image: ollama/ollama:latest
     container_name: ${CONTAINER_NAME:-jarvis-ollama}
     ports:
       - "11434:11434"
@@ -82,11 +80,11 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
-      test: ["CMD", "sh", "-c", "command -v curl >/dev/null 2>&1 && curl -s http://localhost:11434/api/tags | grep -q llama3.2 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 120s
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   # PostgreSQL Database (existing)
   postgres:

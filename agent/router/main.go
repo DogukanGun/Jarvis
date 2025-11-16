@@ -49,7 +49,7 @@ func (s *RouterServer) handleMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	response, err := s.routerService.ProcessMessage(ctx, req.Message)
@@ -70,7 +70,7 @@ func (s *RouterServer) handleMessage(w http.ResponseWriter, r *http.Request) {
 func (s *RouterServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"status": "healthy",
+		"status":  "healthy",
 		"service": "router",
 	})
 }
@@ -86,7 +86,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	
+
 	r.Post("/message", server.handleMessage)
 	r.Get("/health", server.handleHealth)
 

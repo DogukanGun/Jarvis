@@ -42,6 +42,9 @@ func NewRouterService() (*RouterService, error) {
 		ollama.WithServerURL(ollamaHost),
 		ollama.WithModel(model),
 		ollama.WithFormat("json"),
+		ollama.WithHTTPClient(&http.Client{
+			Timeout: 3 * time.Minute,
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ollama client: %v", err)
@@ -306,21 +309,38 @@ func validTool(name string) bool {
 }
 
 func systemMessage() string {
-	bs, err := json.Marshal(functions)
-	if err != nil {
-		log.Fatal(err)
-	}
+	return `You are a router agent that determines which specialized agent should handle a user's request.
 
-	return fmt.Sprintf(`You have access to the following tools:
+Based on the user's request, choose the appropriate tool:
 
-%s
+1. "coder" - for programming, coding, development, technical implementation requests
+2. "general" - for general questions, explanations, non-coding tasks
 
-To use a tool, respond with a JSON object with the following structure: 
+Respond with a JSON object in exactly this format:
 {
-	"tool": <name of the called tool>,
-	"tool_input": <parameters for the tool matching the above JSON schema>
+	"tool": "coder",
+	"tool_input": {
+		"demand": "the user's complete request here"
+	}
 }
-`, string(bs))
+
+OR
+
+{
+	"tool": "general", 
+	"tool_input": {
+		"demand": "the user's complete request here"
+	}
+}
+
+Examples:
+User: "Write a Python function to sort a list"
+Response: {"tool": "coder", "tool_input": {"demand": "Write a Python function to sort a list"}}
+
+User: "What is the capital of France?"
+Response: {"tool": "general", "tool_input": {"demand": "What is the capital of France?"}}
+
+Always include the complete user request in the "demand" field.`
 }
 
 var functions = []llms.FunctionDefinition{
