@@ -18,7 +18,8 @@ type RouterServer struct {
 }
 
 type MessageRequest struct {
-	Message string `json:"message"`
+	Message   string `json:"message"`
+	ImageData string `json:"image_data,omitempty"` // Base64 encoded image
 }
 
 type MessageResponse struct {
@@ -52,7 +53,7 @@ func (s *RouterServer) handleMessage(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	response, err := s.routerService.ProcessMessage(ctx, req.Message)
+	response, err := s.routerService.ProcessMessage(ctx, req.Message, req.ImageData)
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -88,7 +89,7 @@ func (s *RouterServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 	// Simple check - if we can't process messages, we're not healthy
 	testMsg := "health check"
-	_, err := s.routerService.ProcessMessage(ctx, testMsg)
+	_, err := s.routerService.ProcessMessage(ctx, testMsg, "")
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		json.NewEncoder(w).Encode(map[string]string{

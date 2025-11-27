@@ -82,3 +82,43 @@ func SendToGeneralAgent(ctx context.Context, message AgentMessage) error {
 
 	return producer.SendMessage(ctx, message)
 }
+
+// SendToVisualAnalyser sends a message to the visual analyser agent
+func SendToVisualAnalyser(ctx context.Context, message AgentMessage) error {
+	producer, err := NewProducer(VisualAnalyserAgentTopic)
+	if err != nil {
+		return fmt.Errorf("failed to create visual analyser producer: %v", err)
+	}
+	defer producer.Close()
+
+	return producer.SendMessage(ctx, message)
+}
+
+// SendIPRegistrationRequest sends a message to the IP agent for registration
+func SendIPRegistrationRequest(ctx context.Context, message IPRegistrationMessage) error {
+	producer, err := NewProducer(IPRegistrationTopic)
+	if err != nil {
+		return fmt.Errorf("failed to create IP registration producer: %v", err)
+	}
+	defer producer.Close()
+
+	// Marshal message
+	messageBytes, err := json.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("failed to marshal IP registration message: %v", err)
+	}
+
+	kafkaMessage := kafka.Message{
+		Key:   []byte(message.ID),
+		Value: messageBytes,
+		Time:  time.Now(),
+	}
+
+	err = producer.writer.WriteMessages(ctx, kafkaMessage)
+	if err != nil {
+		return fmt.Errorf("failed to write IP registration message: %v", err)
+	}
+
+	log.Printf("IP registration request sent to topic %s: %s", IPRegistrationTopic, message.ID)
+	return nil
+}

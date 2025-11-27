@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/llms/ollama"
 	"io"
 	"jarvis/agent/utils/kafka"
 	"log"
@@ -16,6 +14,9 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/llms/ollama"
 )
 
 var flagVerbose = flag.Bool("v", false, "verbose mode")
@@ -176,7 +177,7 @@ func pullModel(modelName string) error {
 	return scanner.Err()
 }
 
-func (rs *RouterService) ProcessMessage(ctx context.Context, userMessage string) (string, error) {
+func (rs *RouterService) ProcessMessage(ctx context.Context, userMessage string, imageData string) (string, error) {
 	var msgs []llms.MessageContent
 
 	// system message defines the available tools.
@@ -197,7 +198,7 @@ func (rs *RouterService) ProcessMessage(ctx context.Context, userMessage string)
 			if *flagVerbose {
 				log.Printf("Call: %v (raw: %v)", c.Tool, choice1.Content)
 			}
-			msg, cont, result := rs.dispatchCall(c)
+			msg, cont, result := rs.dispatchCall(c, imageData)
 			if !cont {
 				return result, nil
 			}
@@ -225,7 +226,7 @@ func unmarshalCall(input string) *Call {
 	return nil
 }
 
-func (rs *RouterService) dispatchCall(c *Call) (llms.MessageContent, bool, string) {
+func (rs *RouterService) dispatchCall(c *Call, imageData string) (llms.MessageContent, bool, string) {
 	// ollama doesn't always respond with a *valid* function call. As we're using prompt
 	// engineering to inject the tools, it may hallucinate.
 	if !validTool(c.Tool) {
@@ -294,6 +295,42 @@ func (rs *RouterService) dispatchCall(c *Call) (llms.MessageContent, bool, strin
 		response := fmt.Sprintf("Successfully routed general request to general agent (Message ID: %s)", message.ID)
 		return llms.MessageContent{}, false, response
 
+	case "visual_analyser":
+		demand, ok := c.Input["demand"].(string)
+		if !ok {
+			log.Printf("invalid input for visual_analyser: %v", c.Input)
+			return llms.TextParts(llms.ChatMessageTypeHuman, "Invalid input format"), true, ""
+		}
+
+		// Validate image data for visual analyser
+		if imageData == "" {
+			log.Printf("No image data provided for visual analyser")
+			return llms.TextParts(llms.ChatMessageTypeHuman, "Image data is required for visual analysis"), true, ""
+		}
+
+		log.Printf("Routing to visual analyser: %s (image size: %d bytes)", demand, len(imageData))
+
+		// Send message to visual analyser via Kafka with image data
+		message := kafka.AgentMessage{
+			ID:        fmt.Sprintf("msg_%d", time.Now().Unix()),
+			UserID:    os.Getenv("USER_ID"),
+			Demand:    demand,
+			ImageData: imageData,
+			Timestamp: time.Now().Unix(),
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		err := kafka.SendToVisualAnalyser(ctx, message)
+		if err != nil {
+			log.Printf("Failed to send message to visual analyser: %v", err)
+			return llms.TextParts(llms.ChatMessageTypeHuman, "Failed to route to visual analyser"), true, ""
+		}
+
+		response := fmt.Sprintf("Successfully routed image analysis request to visual analyser (Message ID: %s, Image size: %d bytes)", message.ID, len(imageData))
+		return llms.MessageContent{}, false, response
+
 	default:
 		// we already checked above if we had a valid tool.
 		panic("unreachable")
@@ -315,6 +352,7 @@ Based on the user's request, choose the appropriate tool:
 
 1. "coder" - for programming, coding, development, technical implementation requests
 2. "general" - for general questions, explanations, non-coding tasks
+3. "visual_analyser" - for image analysis, IP protection, similarity detection, checking for duplicate images, registering visual assets
 
 Respond with a JSON object in exactly this format:
 {
@@ -333,12 +371,27 @@ OR
 	}
 }
 
+OR
+
+{
+	"tool": "visual_analyser",
+	"tool_input": {
+		"demand": "the user's complete request here"
+	}
+}
+
 Examples:
 User: "Write a Python function to sort a list"
 Response: {"tool": "coder", "tool_input": {"demand": "Write a Python function to sort a list"}}
 
 User: "What is the capital of France?"
 Response: {"tool": "general", "tool_input": {"demand": "What is the capital of France?"}}
+
+User: "Check if this image is similar to existing IP assets"
+Response: {"tool": "visual_analyser", "tool_input": {"demand": "Check if this image is similar to existing IP assets"}}
+
+User: "Register my artwork as IP"
+Response: {"tool": "visual_analyser", "tool_input": {"demand": "Register my artwork as IP"}}
 
 Always include the complete user request in the "demand" field.`
 }
@@ -362,6 +415,17 @@ var functions = []llms.FunctionDefinition{
 			"type": "object", 
 			"properties": {
 				"demand": {"type": "string", "description": "What user wants develop something"}
+			}, 
+			"required": ["demand"]
+		}`),
+	},
+	{
+		Name:        "visual_analyser",
+		Description: "This is an agent which handles image analysis, IP protection, similarity detection, checking for duplicate images, and registering visual assets",
+		Parameters: json.RawMessage(`{
+			"type": "object", 
+			"properties": {
+				"demand": {"type": "string", "description": "What user wants regarding image analysis or IP protection"}
 			}, 
 			"required": ["demand"]
 		}`),

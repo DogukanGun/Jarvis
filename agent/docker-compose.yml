@@ -81,9 +81,9 @@ services:
       retries: 5
       start_period: 60s
 
-  # PostgreSQL Database (existing)
+  # PostgreSQL Database with pgvector extension
   postgres:
-    image: postgres:15-alpine
+    image: ankane/pgvector:v0.5.1
     container_name: jarvis-postgres
     ports:
       - "5432:5432"
@@ -93,6 +93,7 @@ services:
       POSTGRES_PASSWORD: jarvispassword
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./visual_analyser/migrations:/docker-entrypoint-initdb.d
     networks:
       - jarvis-network
     restart: unless-stopped
@@ -180,33 +181,64 @@ services:
       - jarvis-network
     restart: unless-stopped
 
-  # Jarvis Coder Agent Service (placeholder for future implementation)
-  agent-coder:
+  # Visual Analyser Service (IP Protection Vector Store)
+  visual-analyser:
     build:
       context: .
-      dockerfile: ./coder/Dockerfile
-    container_name: jarvis-agent-coder
+      dockerfile: visual_analyser/Dockerfile
+    container_name: jarvis-visual-analyser
     ports:
-      - "8082:8080"
+      - "8084:8080"
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - AGENT_MODE=http
-      - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USER=neo4j
-      - NEO4J_PASSWORD=jarvispassword
+      - DATABASE_URL=postgres://jarvis:jarvispassword@postgres:5432/jarvis?sslmode=disable
+      - PORT=8080
+      - ENABLE_KAFKA=true
       - KAFKA_BROKERS=kafka:29092
     depends_on:
       postgres:
-        condition: service_healthy
-      neo4j:
         condition: service_healthy
       kafka:
         condition: service_healthy
     networks:
       - jarvis-network
     restart: unless-stopped
-    profiles:
-      - coder  # This prevents it from starting by default until Dockerfile is created
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  # IP Agent Service (Story Protocol Integration)
+  ip-agent:
+    build:
+      context: ./ip-agent
+      dockerfile: Dockerfile
+    container_name: jarvis-ip-agent
+    ports:
+      - "8085:8085"
+    environment:
+      - PORT=8085
+      - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY}
+      - RPC_PROVIDER_URL=${RPC_PROVIDER_URL:-https://aeneid.storyrpc.io}
+      - CHAIN_ID=${CHAIN_ID:-aeneid}
+      - SPG_NFT_CONTRACT=${SPG_NFT_CONTRACT:-0xc32A8a0FF3beDDDa58393d022aF433e78739FAbc}
+      - PINATA_JWT=${PINATA_JWT}
+      - ENABLE_KAFKA=true
+      - KAFKA_BROKERS=kafka:29092
+      - VISUAL_ANALYSER_URL=http://visual-analyser:8080
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8085/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
 
 volumes:
   neo4j_data:
