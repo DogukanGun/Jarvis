@@ -331,6 +331,35 @@ func (rs *RouterService) dispatchCall(c *Call, imageData string) (llms.MessageCo
 		response := fmt.Sprintf("Successfully routed image analysis request to visual analyser (Message ID: %s, Image size: %d bytes)", message.ID, len(imageData))
 		return llms.MessageContent{}, false, response
 
+	case "gui":
+		demand, ok := c.Input["demand"].(string)
+		if !ok {
+			log.Printf("invalid input for gui: %v", c.Input)
+			return llms.TextParts(llms.ChatMessageTypeHuman, "Invalid input format"), true, ""
+		}
+
+		log.Printf("Routing to GUI agent: %s", demand)
+
+		// Send message to GUI agent via Kafka
+		message := kafka.AgentMessage{
+			ID:        fmt.Sprintf("msg_%d", time.Now().Unix()),
+			UserID:    os.Getenv("USER_ID"),
+			Demand:    demand,
+			Timestamp: time.Now().Unix(),
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		err := kafka.SendToGUIAgent(ctx, message)
+		if err != nil {
+			log.Printf("Failed to send message to GUI agent: %v", err)
+			return llms.TextParts(llms.ChatMessageTypeHuman, "Failed to route to GUI agent"), true, ""
+		}
+
+		response := fmt.Sprintf("Successfully routed GUI automation request to GUI agent (Message ID: %s)", message.ID)
+		return llms.MessageContent{}, false, response
+
 	default:
 		// we already checked above if we had a valid tool.
 		panic("unreachable")
@@ -351,8 +380,9 @@ func systemMessage() string {
 Based on the user's request, choose the appropriate tool:
 
 1. "coder" - for programming, coding, development, technical implementation requests
-2. "general" - for general questions, explanations, non-coding tasks
+2. "general" - for general questions, explanations, non-coding tasks, file operations, web scraping
 3. "visual_analyser" - for image analysis, IP protection, similarity detection, checking for duplicate images, registering visual assets
+4. "gui" - for GUI automation, controlling mouse/keyboard, clicking, typing, taking screenshots, opening applications, desktop automation
 
 Respond with a JSON object in exactly this format:
 {
@@ -365,7 +395,7 @@ Respond with a JSON object in exactly this format:
 OR
 
 {
-	"tool": "general", 
+	"tool": "general",
 	"tool_input": {
 		"demand": "the user's complete request here"
 	}
@@ -375,6 +405,15 @@ OR
 
 {
 	"tool": "visual_analyser",
+	"tool_input": {
+		"demand": "the user's complete request here"
+	}
+}
+
+OR
+
+{
+	"tool": "gui",
 	"tool_input": {
 		"demand": "the user's complete request here"
 	}
@@ -390,8 +429,17 @@ Response: {"tool": "general", "tool_input": {"demand": "What is the capital of F
 User: "Check if this image is similar to existing IP assets"
 Response: {"tool": "visual_analyser", "tool_input": {"demand": "Check if this image is similar to existing IP assets"}}
 
-User: "Register my artwork as IP"
-Response: {"tool": "visual_analyser", "tool_input": {"demand": "Register my artwork as IP"}}
+User: "Move the mouse to 500, 300 and click"
+Response: {"tool": "gui", "tool_input": {"demand": "Move the mouse to 500, 300 and click"}}
+
+User: "Take a screenshot"
+Response: {"tool": "gui", "tool_input": {"demand": "Take a screenshot"}}
+
+User: "Open Firefox browser"
+Response: {"tool": "gui", "tool_input": {"demand": "Open Firefox browser"}}
+
+User: "Type 'Hello World' on the keyboard"
+Response: {"tool": "gui", "tool_input": {"demand": "Type 'Hello World' on the keyboard"}}
 
 Always include the complete user request in the "demand" field.`
 }
@@ -401,21 +449,21 @@ var functions = []llms.FunctionDefinition{
 		Name:        "coder",
 		Description: "This is an agent which is responsible to handle coding part if user wants develop something",
 		Parameters: json.RawMessage(`{
-			"type": "object", 
+			"type": "object",
 			"properties": {
 				"demand": {"type": "string", "description": "What user wants develop something"}
-			}, 
+			},
 			"required": ["demand"]
 		}`),
 	},
 	{
 		Name:        "general",
-		Description: "This is agent which is responsible to answer user's question like general thing",
+		Description: "This is agent which is responsible to answer user's question like general thing, file operations, web scraping",
 		Parameters: json.RawMessage(`{
-			"type": "object", 
+			"type": "object",
 			"properties": {
 				"demand": {"type": "string", "description": "What user wants develop something"}
-			}, 
+			},
 			"required": ["demand"]
 		}`),
 	},
@@ -423,10 +471,21 @@ var functions = []llms.FunctionDefinition{
 		Name:        "visual_analyser",
 		Description: "This is an agent which handles image analysis, IP protection, similarity detection, checking for duplicate images, and registering visual assets",
 		Parameters: json.RawMessage(`{
-			"type": "object", 
+			"type": "object",
 			"properties": {
 				"demand": {"type": "string", "description": "What user wants regarding image analysis or IP protection"}
-			}, 
+			},
+			"required": ["demand"]
+		}`),
+	},
+	{
+		Name:        "gui",
+		Description: "This is an agent which handles GUI automation tasks like controlling mouse, keyboard, taking screenshots, opening applications, clicking buttons, typing text, and any desktop automation",
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"demand": {"type": "string", "description": "What user wants regarding GUI automation"}
+			},
 			"required": ["demand"]
 		}`),
 	},

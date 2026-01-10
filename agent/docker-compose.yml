@@ -103,34 +103,6 @@ services:
       timeout: 10s
       retries: 5
 
-  # Jarvis API Service
-  jarvis-api:
-    build:
-      context: ../api
-      dockerfile: Dockerfile
-    container_name: jarvis-api
-    ports:
-      - "8080:8080"
-    environment:
-      - DATABASE_URL=postgres://jarvis:jarvis
-      - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USER=neo4j
-      - NEO4J_PASSWORD=jarvispassword
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - KAFKA_BROKERS=kafka:29092
-    depends_on:
-      postgres:
-        condition: service_healthy
-      neo4j:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-    networks:
-      - jarvis-network
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock  # For managing agent containers
-
   # Jarvis General Agent Service
   agent-general:
     build:
@@ -140,7 +112,8 @@ services:
     ports:
       - "${CLI_PORT:-8081}:8080"
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
       - AGENT_MODE=http
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USER=neo4j
@@ -153,6 +126,8 @@ services:
       neo4j:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     networks:
       - jarvis-network
@@ -181,60 +156,75 @@ services:
       - jarvis-network
     restart: unless-stopped
 
-  # Visual Analyser Service (IP Protection Vector Store)
-  visual-analyser:
+  # Jarvis GUI Agent Service
+  agent-gui:
     build:
       context: .
-      dockerfile: visual_analyser/Dockerfile
-    container_name: jarvis-visual-analyser
+      dockerfile: ./gui-agent/Dockerfile
+    container_name: jarvis-agent-gui
     ports:
-      - "8084:8080"
+      - "8082:8080"
     environment:
-      - DATABASE_URL=postgres://jarvis:jarvispassword@postgres:5432/jarvis?sslmode=disable
-      - PORT=8080
-      - ENABLE_KAFKA=true
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+      - USER_ID=${USER_ID:-default}
+      - GUI_DAEMON_URL=http://gui-daemon:9990
+      - VISUAL_ANALYSER_URL=http://visual-analyser:8080
       - KAFKA_BROKERS=kafka:29092
     depends_on:
-      postgres:
-        condition: service_healthy
       kafka:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      gui-daemon:
+        condition: service_healthy
+      visual-analyser:
         condition: service_healthy
     networks:
       - jarvis-network
     restart: unless-stopped
+
+  # Jarvis GUI Daemon Service
+  gui-daemon:
+    build:
+      context: .
+      dockerfile: ./gui-daemon/Dockerfile
+    container_name: jarvis-gui-daemon
+    ports:
+      - "9990:9990"
+    environment:
+      - PORT=9990
+      - DISPLAY=:99
+    networks:
+      - jarvis-network
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9990/health"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 10s
 
-  # IP Agent Service (Story Protocol Integration)
-  ip-agent:
+  # Jarvis Visual Analyser Service (GUI Screen Analysis)
+  visual-analyser:
     build:
-      context: ./ip-agent
-      dockerfile: Dockerfile
-    container_name: jarvis-ip-agent
+      context: .
+      dockerfile: ./visual_analyser/Dockerfile
+    container_name: jarvis-visual-analyser
     ports:
-      - "8085:8085"
+      - "8084:8080"
     environment:
-      - PORT=8085
-      - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY}
-      - RPC_PROVIDER_URL=${RPC_PROVIDER_URL:-https://aeneid.storyrpc.io}
-      - CHAIN_ID=${CHAIN_ID:-aeneid}
-      - SPG_NFT_CONTRACT=${SPG_NFT_CONTRACT:-0xc32A8a0FF3beDDDa58393d022aF433e78739FAbc}
-      - PINATA_JWT=${PINATA_JWT}
-      - ENABLE_KAFKA=true
-      - KAFKA_BROKERS=kafka:29092
-      - VISUAL_ANALYSER_URL=http://visual-analyser:8080
+      - PORT=8080
+      - OLLAMA_HOST=http://ollama:11434
+      - VISION_MODEL=${VISION_MODEL:-llama3.2-vision}
     depends_on:
-      kafka:
+      ollama:
         condition: service_healthy
     networks:
       - jarvis-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8085/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 5

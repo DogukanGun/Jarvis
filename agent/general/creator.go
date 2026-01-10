@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"jarvis/agent/general/db"
 	jarvisTools2 "jarvis/agent/tools"
+	"net/http"
 	"time"
 
 	"github.com/tmc/langchaingo/agents"
-	"github.com/tmc/langchaingo/llms/openai"
+	"github.com/tmc/langchaingo/llms/ollama"
 	"github.com/tmc/langchaingo/tools"
 	"github.com/tmc/langchaingo/tools/wikipedia"
 )
@@ -23,8 +24,8 @@ type JarvisAgent struct {
 // AgentConfig holds configuration for creating an agent
 type AgentConfig struct {
 	UserID      string
-	OpenAIModel string
-	OpenAIKey   string
+	OllamaHost  string
+	OllamaModel string
 	Neo4jURI    string
 	Neo4jUser   string
 	Neo4jPass   string
@@ -32,26 +33,26 @@ type AgentConfig struct {
 
 // NewJarvisAgent creates a new Jarvis agent instance
 func NewJarvisAgent(config AgentConfig) (*JarvisAgent, error) {
-	// Initialize OpenAI LLM
-	model := config.OpenAIModel
-	if model == "" {
-		model = "gpt-4o-mini"
+	// Initialize Ollama LLM
+	ollamaHost := config.OllamaHost
+	if ollamaHost == "" {
+		ollamaHost = "http://localhost:11434"
 	}
 
-	var llm *openai.LLM
-	var err error
-
-	if config.OpenAIKey != "" {
-		llm, err = openai.New(
-			openai.WithModel(model),
-			openai.WithToken(config.OpenAIKey),
-		)
-	} else {
-		llm, err = openai.New(openai.WithModel(model))
+	ollamaModel := config.OllamaModel
+	if ollamaModel == "" {
+		ollamaModel = "llama3.2"
 	}
 
+	llm, err := ollama.New(
+		ollama.WithServerURL(ollamaHost),
+		ollama.WithModel(ollamaModel),
+		ollama.WithHTTPClient(&http.Client{
+			Timeout: 3 * time.Minute,
+		}),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize OpenAI: %v", err)
+		return nil, fmt.Errorf("failed to initialize Ollama: %v", err)
 	}
 
 	// Initialize Wikipedia tool with proper user agent
@@ -85,8 +86,8 @@ func NewJarvisAgent(config AgentConfig) (*JarvisAgent, error) {
 		}
 	}
 
-	// Create OpenAI Functions agent
-	agent := agents.NewOpenAIFunctionsAgent(llm, allTools)
+	// Create agent executor using conversational agent for Ollama
+	agent := agents.NewConversationalAgent(llm, allTools)
 	executor := agents.NewExecutor(agent)
 
 	return &JarvisAgent{

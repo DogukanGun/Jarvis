@@ -1,17 +1,12 @@
 package kafka
 
 const (
-	// Topic names for different agents
+	// CoderAgentTopic Topic names for different agents
 	CoderAgentTopic          = "coder-agent-requests"
 	GeneralAgentTopic        = "general-agent-requests"
 	VisualAnalyserAgentTopic = "visual-analyser-requests"
+	GUIAgentTopic            = "gui-agent-requests"
 	IPRegistrationTopic      = "ip-registration-requests"
-
-	// Consumer group IDs
-	CoderAgentGroup          = "coder-agent-group"
-	GeneralAgentGroup        = "general-agent-group"
-	VisualAnalyserAgentGroup = "visual-analyser-group"
-	IPAgentGroup             = "ip-agent-group"
 )
 
 // AgentMessage represents a message sent between agents

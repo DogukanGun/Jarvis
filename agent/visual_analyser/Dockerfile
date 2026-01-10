@@ -1,13 +1,9 @@
-# Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache git gcc musl-dev
+WORKDIR /build
 
-WORKDIR /app
-
-# Copy go mod files from agent root
-COPY go.mod go.sum ./
+# Copy go mod files
+COPY go.mod ./
 
 # Download dependencies
 RUN go mod download
@@ -15,22 +11,21 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the visual_analyser application
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o visual-analyser ./visual_analyser
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -o visual-analyser .
 
-# Runtime stage
+# Final stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates wget
+RUN apk --no-cache add ca-certificates
 
-WORKDIR /root/
+WORKDIR /app
 
-# Copy the binary from builder
-COPY --from=builder /app/visual-analyser .
+# Copy binary from builder
+COPY --from=builder /build/visual-analyser .
 
 # Expose port
 EXPOSE 8080
 
 # Run the application
 CMD ["./visual-analyser"]
-

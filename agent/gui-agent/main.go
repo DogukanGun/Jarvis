@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-type AgentServer struct {
-	agent *JarvisAgent
+type GUIAgentServer struct {
+	agent *GUIAgent
 }
 
 type MessageRequest struct {
@@ -23,27 +23,24 @@ type MessageResponse struct {
 	Error    string `json:"error,omitempty"`
 }
 
-func NewAgentServer(userID string) (*AgentServer, error) {
-	config := AgentConfig{
-		UserID:      userID,
-		OllamaHost:  getEnvOrDefault("OLLAMA_HOST", "http://ollama:11434"),
-		OllamaModel: getEnvOrDefault("OLLAMA_MODEL", "llama3.2"),
-		Neo4jURI:    getEnvOrDefault("NEO4J_URI", "bolt://neo4j:7687"),
-		Neo4jUser:   getEnvOrDefault("NEO4J_USER", "neo4j"),
-		Neo4jPass:   getEnvOrDefault("NEO4J_PASSWORD", "jarvispassword"),
+func NewGUIAgentServer() (*GUIAgentServer, error) {
+	config := GUIAgentConfig{
+		OllamaHost:   getEnvOrDefault("OLLAMA_HOST", "http://127.0.0.1:11434"),
+		OllamaModel:  getEnvOrDefault("OLLAMA_MODEL", "llama3.2"),
+		GUIDaemonURL: getEnvOrDefault("GUI_DAEMON_URL", "http://localhost:9990/"),
 	}
 
-	jarvisAgent, err := NewJarvisAgent(config)
+	guiAgent, err := NewGUIAgent(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create agent: %v", err)
+		return nil, fmt.Errorf("failed to create GUI agent: %v", err)
 	}
 
-	return &AgentServer{
-		agent: jarvisAgent,
+	return &GUIAgentServer{
+		agent: guiAgent,
 	}, nil
 }
 
-func (s *AgentServer) handleAgent(w http.ResponseWriter, r *http.Request) {
+func (s *GUIAgentServer) handleAgent(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -60,7 +57,7 @@ func (s *AgentServer) handleAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Hour)
 	defer cancel()
 
 	response, err := s.agent.ProcessMessage(ctx, req.Message)
@@ -78,15 +75,15 @@ func (s *AgentServer) handleAgent(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (s *AgentServer) handleHealth(w http.ResponseWriter, r *http.Request) {
+func (s *GUIAgentServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"status": "healthy",
-		"userID": s.agent.GetUserID(),
+		"agent":  "gui-agent",
 	})
 }
 
-func (s *AgentServer) handleCapabilities(w http.ResponseWriter, r *http.Request) {
+func (s *GUIAgentServer) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"tools":        s.agent.GetAvailableTools(),
@@ -95,14 +92,10 @@ func (s *AgentServer) handleCapabilities(w http.ResponseWriter, r *http.Request)
 }
 
 func main() {
-	userID := os.Getenv("USER_ID")
-	if userID == "" {
-		log.Fatal("USER_ID environment variable is required")
-	}
 
-	server, err := NewAgentServer(userID)
+	server, err := NewGUIAgentServer()
 	if err != nil {
-		log.Fatalf("Failed to create agent server: %v", err)
+		log.Fatalf("Failed to create GUI agent server: %v", err)
 	}
 
 	port := getEnvOrDefault("PORT", "8080")
@@ -111,7 +104,7 @@ func main() {
 	http.HandleFunc("/health", server.handleHealth)
 	http.HandleFunc("/capabilities", server.handleCapabilities)
 
-	log.Printf("Starting agent server for user %s on port %s", userID, port)
+	log.Printf("GUI Daemon URL: %s", os.Getenv("GUI_DAEMON_URL"))
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 

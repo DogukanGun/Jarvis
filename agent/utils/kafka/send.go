@@ -94,6 +94,17 @@ func SendToVisualAnalyser(ctx context.Context, message AgentMessage) error {
 	return producer.SendMessage(ctx, message)
 }
 
+// SendToGUIAgent sends a message to the GUI agent
+func SendToGUIAgent(ctx context.Context, message AgentMessage) error {
+	producer, err := NewProducer(GUIAgentTopic)
+	if err != nil {
+		return fmt.Errorf("failed to create GUI agent producer: %v", err)
+	}
+	defer producer.Close()
+
+	return producer.SendMessage(ctx, message)
+}
+
 // SendIPRegistrationRequest sends a message to the IP agent for registration
 func SendIPRegistrationRequest(ctx context.Context, message IPRegistrationMessage) error {
 	producer, err := NewProducer(IPRegistrationTopic)
