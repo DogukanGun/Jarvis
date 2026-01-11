@@ -160,7 +160,7 @@ services:
   agent-gui:
     build:
       context: .
-      dockerfile: ./gui-agent/Dockerfile
+      dockerfile: gui/gui-agent/Dockerfile
     container_name: jarvis-agent-gui
     ports:
       - "8082:8080"
@@ -188,7 +188,7 @@ services:
   gui-daemon:
     build:
       context: .
-      dockerfile: ./gui-daemon/Dockerfile
+      dockerfile: gui/gui-daemon/Dockerfile
     container_name: jarvis-gui-daemon
     ports:
       - "9990:9990"

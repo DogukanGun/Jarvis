@@ -1,0 +1,30 @@
+{
+  "name": "@qwen-code/qwen-code-http-wrapper",
+  "version": "0.1.0",
+  "description": "HTTP Wrapper for Qwen Code Core with Ollama support",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QwenLM/qwen-code.git"
+  },
+  "scripts": {
+    "build": "pnpm run build --filter=@qwen-code/qwen-code-core --filter=@qwen-code/http-wrapper",
+    "build:core": "pnpm run build --filter=@qwen-code/qwen-code-core",
+    "build:http-wrapper": "pnpm run build --filter=@qwen-code/http-wrapper",
+    "dev": "pnpm --filter=@qwen-code/http-wrapper run dev",
+    "dev:http-wrapper": "pnpm --filter=@qwen-code/http-wrapper run dev",
+    "test": "pnpm run test --workspaces --if-present",
+    "typecheck": "pnpm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "prettier": "^3.5.3",
+    "typescript": "^5.3.3"
+  }
+}
