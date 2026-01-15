@@ -1,0 +1,20 @@
+# Jarvis Memory Orchestration - MainGraph Requirements
+
+# Core dependencies
+httpx>=0.24.0              # HTTP client for mem0 API and Ollama
+pydantic>=2.0.0            # Data validation and schemas
+
+# LangGraph for graph orchestration
+langgraph>=0.0.20
+langchain-core<1.0.0,>=0.3.0
+
+# Kafka for async communication
+kafka-python>=2.0.2        # Kafka producer/consumer
+
+# Testing
+pytest>=7.0.0
+pytest-cov>=4.0.0          # Coverage reports
+
+# Optional: LLM providers (uncomment as needed)
+# openai>=1.0.0            # For OpenAI GPT models
+# anthropic>=0.7.0         # For Anthropic Claude models

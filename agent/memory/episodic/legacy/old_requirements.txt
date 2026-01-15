@@ -1,0 +1,13 @@
+# Requirements for Jarvis Memory Episodic - Nodes 1-2
+
+# Core dependencies
+# Node 1 (preprocess_node.py) uses only Python stdlib: re, enum, typing
+# Node 2 (mem0_nodes.py) requires:
+httpx>=0.24.0  # HTTP client for mem0 API
+
+# Testing dependencies
+pytest>=7.0.0
+
+# Optional: For LangGraph integration (to be added later)
+# langgraph>=0.0.1
+# langchain>=0.1.0

@@ -1,0 +1,571 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mem0 Memory API",
+    "description": "Self-hosted memory layer API for AI agents and assistants",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Root",
+        "description": "Root endpoint - API information",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Health check endpoint",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/add": {
+      "post": {
+        "summary": "Add Memory",
+        "description": "Add a new memory from text",
+        "operationId": "add_memory_memory_add_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMemoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/add-messages": {
+      "post": {
+        "summary": "Add Messages",
+        "description": "Add memories from conversation messages",
+        "operationId": "add_messages_memory_add_messages_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMessagesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/search": {
+      "post": {
+        "summary": "Search Memories",
+        "description": "Search for relevant memories",
+        "operationId": "search_memories_memory_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchMemoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/get-all": {
+      "post": {
+        "summary": "Get All Memories",
+        "description": "Get all memories for a user",
+        "operationId": "get_all_memories_memory_get_all_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetAllMemoriesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/update": {
+      "put": {
+        "summary": "Update Memory",
+        "description": "Update an existing memory",
+        "operationId": "update_memory_memory_update_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/delete": {
+      "delete": {
+        "summary": "Delete Memory",
+        "description": "Delete a specific memory",
+        "operationId": "delete_memory_memory_delete_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteMemoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory/delete-all": {
+      "delete": {
+        "summary": "Delete All Memories",
+        "description": "Delete all memories for a user",
+        "operationId": "delete_all_memories_memory_delete_all_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetAllMemoriesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddMemoryRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Memory text content"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "User identifier"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "Optional metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "user_id"
+        ],
+        "title": "AddMemoryRequest",
+        "example": {
+          "metadata": {
+            "category": "hobbies"
+          },
+          "text": "I love playing basketball on weekends",
+          "user_id": "user123"
+        }
+      },
+      "AddMessagesRequest": {
+        "properties": {
+          "messages": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Messages",
+            "description": "Conversation messages"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "User identifier"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "Optional metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "messages",
+          "user_id"
+        ],
+        "title": "AddMessagesRequest",
+        "example": {
+          "messages": [
+            {
+              "content": "Hi, I'm Alex. I love basketball.",
+              "role": "user"
+            },
+            {
+              "content": "Nice to meet you Alex!",
+              "role": "assistant"
+            }
+          ],
+          "user_id": "user123"
+        }
+      },
+      "DeleteMemoryRequest": {
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "title": "Memory Id",
+            "description": "Memory ID to delete"
+          }
+        },
+        "type": "object",
+        "required": [
+          "memory_id"
+        ],
+        "title": "DeleteMemoryRequest"
+      },
+      "GetAllMemoriesRequest": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "User identifier"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "title": "GetAllMemoriesRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "MemoryResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "data": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "MemoryResponse"
+      },
+      "SearchMemoryRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query",
+            "description": "Search query"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "User identifier"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Limit",
+            "description": "Maximum number of results",
+            "default": 5
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "user_id"
+        ],
+        "title": "SearchMemoryRequest",
+        "example": {
+          "limit": 5,
+          "query": "What are my hobbies?",
+          "user_id": "user123"
+        }
+      },
+      "UpdateMemoryRequest": {
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "title": "Memory Id",
+            "description": "Memory ID to update"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "New memory text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "memory_id",
+          "text"
+        ],
+        "title": "UpdateMemoryRequest",
+        "example": {
+          "memory_id": "mem_123abc",
+          "text": "I love playing basketball and tennis on weekends"
+        }
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

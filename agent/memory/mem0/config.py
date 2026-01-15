@@ -29,7 +29,7 @@ class Mem0Config:
         
         # Ollama Configuration
         self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-        self.ollama_llm_model = os.getenv("OLLAMA_LLM_MODEL", "llama3.1:latest")
+        self.ollama_llm_model = os.getenv("OLLAMA_LLM_MODEL", "llama3.1:8b")
         self.ollama_embedding_model = os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text:latest")
         
         # Mem0 Settings
