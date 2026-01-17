@@ -12,17 +12,8 @@ class Config:
     MAX_COMPILER_RETRIES: int = int(os.getenv("HACKER_MAX_COMPILER_RETRIES", "3"))
 
     # Command allowlist - commands that are allowed to execute
-    # Empty list means all commands are allowed (use with caution)
-    COMMAND_ALLOWLIST: list[str] = [
-        "ls", "pwd", "cat", "head", "tail", "grep", "find", "wc",
-        "echo", "date", "whoami", "uname", "env", "which", "type",
-        "cd", "mkdir", "touch", "cp", "mv", "rm",
-        "curl", "wget",
-        "python", "python3", "pip", "pip3",
-        "node", "npm", "npx",
-        "git",
-        "docker", "docker-compose",
-    ]
+    # Empty list means all commands are allowed
+    COMMAND_ALLOWLIST: list[str] = []
 
     # Dangerous patterns to block
     DANGEROUS_PATTERNS: list[str] = [

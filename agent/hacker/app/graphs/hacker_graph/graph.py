@@ -24,12 +24,14 @@ def create_hacker_graph() -> StateGraph:
 
     Flow:
         START → init_state → planner → compiler ──┬──(finish)──→ END
-                                ↑                  │
-                                │             (run_cli)
-                                │                  ↓
-                           guards ← executor ← validator
-                                │                  ↑
-                                └──(invalid)───────┘
+                                ↑                  ├──(direct_tool)──┐
+                                │                  │                 │
+                                │             (run_cli)              │
+                                │                  ↓                 │
+                           guards ← executor ← validator             │
+                                │                  ↑                 │
+                                │   (invalid)──────┘                 │
+                                └─────────────────────────────────────┘
 
     Returns:
         Compiled LangGraph ready for execution.
@@ -56,13 +58,14 @@ def create_hacker_graph() -> StateGraph:
     # planner → compiler (always goes to compiler now)
     graph.add_edge("planner", "compiler")
 
-    # compiler → (finish → END) or (run_cli → validator) or (error → END)
+    # compiler → (finish → END) or (run_cli → validator) or (direct_tool → planner) or (error → END)
     graph.add_conditional_edges(
         "compiler",
         compiler_router,
         {
             "finish": END,
             "run_cli": "validator",
+            "direct_tool": "planner",  # Direct tools execute and return to planner
             "error": END,
         }
     )

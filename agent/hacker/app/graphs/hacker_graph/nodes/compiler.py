@@ -7,6 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from app.clients.ollama_client import get_compiler_client
 from app.graphs.hacker_graph.state import HackerGraphState
+from app.graphs.hacker_graph.tools import network_discovery_nmap
 from app.config import config
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 @tool
 def run_cli(cmd: str) -> str:
     """
-    Execute a CLI command to gather information or perform an action.
+    Execute a general CLI command to gather information or perform an action.
 
     Args:
         cmd: The exact CLI command to execute (e.g., "ls -la", "find . -name '*.py'")
@@ -40,21 +41,34 @@ def finish(answer: str) -> str:
     return f"Task finished: {answer}"
 
 
+# Collect all available tools
+AVAILABLE_TOOLS = [run_cli, finish, network_discovery_nmap]
+
+# Tools that execute directly (return results immediately)
+DIRECT_EXECUTION_TOOLS = {"network_discovery_nmap", "port_scan_netcat"}
+
+
 COMPILER_PROMPT = ChatPromptTemplate.from_messages([
     ("system", """You are a command compiler. You read the planner's decision and execute the appropriate action.
 
-You have TWO tools:
-1. run_cli(cmd) - Execute a CLI command
+AVAILABLE TOOLS:
+1. run_cli(cmd) - Execute a general CLI command
 2. finish(answer) - Complete the task with a final answer
-
+3. network_discovery_nmap(target, ports, ping_only, timing) - Run nmap scan on private/loopback networks
+4. port_scan_netcat(target: str, ports: List[int], timeout_seconds: int = 2, tcp: bool = True) - Run nc to scan ports
 RULES:
-- If the planner wants to run a command, call run_cli with the exact command
-- If the planner is providing a final answer (not asking to run a command), call finish with that answer
-- Extract the exact command or answer from the planner's text
+- If planner wants to run a general command, use run_cli
+- If planner wants network scanning/discovery, use network_discovery_nmap
+- If planner provides a final answer, use finish
+- Extract exact parameters from the planner's text
 
-Allowed CLI commands: {allowlist}
+For network_discovery_nmap:
+- target: IP or CIDR (e.g., "192.168.1.0/24", "10.0.0.1")
+- ports: port range (default "1-1024")
+- ping_only: true for host discovery only
+- timing: T0-T5 (default T3)
 
-IMPORTANT: You MUST call exactly one tool. Either run_cli OR finish."""),
+IMPORTANT: Call exactly ONE tool per decision."""),
     ("human", "Planner decision: {input}"),
     ("placeholder", "{agent_scratchpad}"),
 ])
@@ -64,15 +78,18 @@ def compiler_node(state: HackerGraphState) -> Dict[str, Any]:
     """
     Compiler Agent - Context-blind, with tool calling.
 
-    Parses Planner's free text and calls either:
-    - run_cli(cmd) -> execute a command
-    - finish(answer) -> complete the task
+    Parses Planner's free text and calls the appropriate tool:
+    - run_cli(cmd) -> goes to validator/executor
+    - finish(answer) -> ends the task
+    - network_discovery_nmap(...) -> executes directly, returns to planner
     """
     logger.info("Compiler node executing...")
 
     decision_text = state.get("decision_text", "")
     validation_errors = state.get("validation_errors", [])
     retry_count = state.get("compiler_retry_count", 0)
+    tool_history = state.get("tool_history", [])
+    step_count = state.get("step_count", 0)
 
     if not decision_text:
         logger.error("No decision text provided to compiler")
@@ -88,13 +105,11 @@ def compiler_node(state: HackerGraphState) -> Dict[str, Any]:
 
     try:
         llm = get_compiler_client()
-        tools = [run_cli, finish]
-        prompt = COMPILER_PROMPT.partial(allowlist=", ".join(config.COMMAND_ALLOWLIST))
 
-        agent = create_tool_calling_agent(llm, tools, prompt)
+        agent = create_tool_calling_agent(llm, AVAILABLE_TOOLS, COMPILER_PROMPT)
         executor = AgentExecutor(
             agent=agent,
-            tools=tools,
+            tools=AVAILABLE_TOOLS,
             verbose=False,
             max_iterations=1,
             return_intermediate_steps=True,
@@ -105,12 +120,15 @@ def compiler_node(state: HackerGraphState) -> Dict[str, Any]:
         # Check which tool was called
         intermediate_steps = result.get("intermediate_steps", [])
         for step in intermediate_steps:
-            if len(step) >= 1:
+            if len(step) >= 2:
                 action = step[0]
+                tool_result = step[1]
+
                 if hasattr(action, "tool"):
                     tool_name = action.tool
                     tool_input = action.tool_input
 
+                    # Handle finish tool
                     if tool_name == "finish":
                         answer = tool_input.get("answer", "") if isinstance(tool_input, dict) else str(tool_input)
                         logger.info(f"Compiler called finish: {answer[:100]}...")
@@ -121,6 +139,7 @@ def compiler_node(state: HackerGraphState) -> Dict[str, Any]:
                             "compiler_retry_count": retry_count + 1,
                         }
 
+                    # Handle run_cli (goes to validator/executor)
                     elif tool_name == "run_cli":
                         cmd = tool_input.get("cmd", "") if isinstance(tool_input, dict) else str(tool_input)
                         logger.info(f"Compiler called run_cli: {cmd}")
@@ -134,13 +153,33 @@ def compiler_node(state: HackerGraphState) -> Dict[str, Any]:
                             "compiler_retry_count": retry_count + 1,
                         }
 
-        # No tool called - try to extract from output
+                    # Handle direct execution tools (execute and return to planner)
+                    elif tool_name in DIRECT_EXECUTION_TOOLS:
+                        logger.info(f"Compiler called {tool_name} with args: {tool_input}")
+                        logger.info(f"Tool result: {str(tool_result)[:200]}...")
+
+                        # Store result like executor does
+                        tool_result_entry = {
+                            "cmd": f"{tool_name}({tool_input})",
+                            "exit_code": 0 if "error" not in str(tool_result).lower() else 1,
+                            "stdout": str(tool_result),
+                            "stderr": "",
+                        }
+
+                        return {
+                            "compiler_action": "direct_tool",
+                            "last_tool_result": tool_result_entry,
+                            "tool_history": tool_history + [tool_result_entry],
+                            "step_count": step_count + 1,
+                            "compiler_retry_count": retry_count + 1,
+                        }
+
+        # No tool called - fallback logic
         output = result.get("output", "")
         logger.warning(f"No tool called, output: {output[:100]}")
 
-        # Fallback: assume it's a finish if no command keywords
+        # Fallback: try to extract command
         if any(kw in decision_text.lower() for kw in ["run ", "execute ", "command"]):
-            # Try to extract command
             import re
             match = re.search(r'(?:run|execute)\s+(.+?)(?:\s+to|\s*$)', decision_text, re.IGNORECASE)
             if match:
@@ -151,7 +190,7 @@ def compiler_node(state: HackerGraphState) -> Dict[str, Any]:
                     "compiler_retry_count": retry_count + 1,
                 }
 
-        # Default to finish with the decision text as answer
+        # Default to finish
         return {
             "compiler_action": "finish",
             "final_answer": decision_text,
@@ -169,7 +208,7 @@ def compiler_node(state: HackerGraphState) -> Dict[str, Any]:
         }
 
 
-def compiler_router(state: HackerGraphState) -> Literal["finish", "run_cli", "error"]:
+def compiler_router(state: HackerGraphState) -> Literal["finish", "run_cli", "direct_tool", "error"]:
     """Router to determine next step after compiler."""
     action = state.get("compiler_action", "error")
     return action
