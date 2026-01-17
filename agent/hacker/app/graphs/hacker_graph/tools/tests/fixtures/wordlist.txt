@@ -1,0 +1,10 @@
+123456
+password
+admin
+abc123
+12345
+guest
+letmein
+welcome
+monkey
+dragon
