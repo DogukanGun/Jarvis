@@ -28,6 +28,8 @@ class Config:
         "reboot",
         "init 0",
         "init 6",
+        "sudo ",  # Block sudo commands (tools handle permissions)
+        "sudo\t",
     ]
 
 

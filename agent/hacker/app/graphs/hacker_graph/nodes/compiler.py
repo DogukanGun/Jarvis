@@ -7,7 +7,15 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from app.clients.ollama_client import get_compiler_client
 from app.graphs.hacker_graph.state import HackerGraphState
-from app.graphs.hacker_graph.tools import network_discovery_nmap
+from app.graphs.hacker_graph.tools import (
+    network_discovery_nmap,
+    port_scan_netcat,
+    ip_resolution_ping,
+    domain_dnsrecon,
+    reverse_lookup_whois,
+    osint_ip_lookup,
+    osint_domain_lookup,
+)
 from app.config import config
 
 logger = logging.getLogger(__name__)
@@ -42,33 +50,78 @@ def finish(answer: str) -> str:
 
 
 # Collect all available tools
-AVAILABLE_TOOLS = [run_cli, finish, network_discovery_nmap]
+AVAILABLE_TOOLS = [
+    run_cli,
+    finish,
+    # Network scanning
+    network_discovery_nmap,
+    port_scan_netcat,
+    ip_resolution_ping,
+    # DNS & WHOIS
+    domain_dnsrecon,
+    reverse_lookup_whois,
+    # OSINT
+    osint_ip_lookup,
+    osint_domain_lookup,
+]
 
 # Tools that execute directly (return results immediately)
-DIRECT_EXECUTION_TOOLS = {"network_discovery_nmap", "port_scan_netcat"}
+DIRECT_EXECUTION_TOOLS = {
+    "network_discovery_nmap",
+    "port_scan_netcat",
+    "ip_resolution_ping",
+    "domain_dnsrecon",
+    "reverse_lookup_whois",
+    "osint_ip_lookup",
+    "osint_domain_lookup",
+}
 
 
 COMPILER_PROMPT = ChatPromptTemplate.from_messages([
     ("system", """You are a command compiler. You read the planner's decision and execute the appropriate action.
 
 AVAILABLE TOOLS:
-1. run_cli(cmd) - Execute a general CLI command
-2. finish(answer) - Complete the task with a final answer
-3. network_discovery_nmap(target, ports, ping_only, timing) - Run nmap scan on private/loopback networks
-4. port_scan_netcat(target: str, ports: List[int], timeout_seconds: int = 2, tcp: bool = True) - Run nc to scan ports
+
+## Network Scanning (PREFER these over raw commands)
+1. network_discovery_nmap(target, ports, ping_only, timing) - Nmap scan for host/port discovery
+   - target: IP or CIDR (e.g., "192.168.1.0/24")
+   - ports: port range (default "1-1024")
+   - ping_only: true for host discovery only (no port scan)
+   - timing: T0-T5 (default T3)
+
+2. port_scan_netcat(target, ports, timeout_seconds, tcp) - Netcat port scan
+   - target: IP address
+   - ports: list of port numbers [22, 80, 443]
+   - timeout_seconds: timeout per port (default 2)
+   - tcp: true for TCP, false for UDP
+
+3. ip_resolution_ping(target, count, timeout_seconds) - Ping host to check reachability
+   - target: hostname or IP
+   - count: number of pings (default 3)
+
+## DNS & WHOIS
+4. domain_dnsrecon(domain, record_types) - DNS reconnaissance
+   - domain: domain name (e.g., "example.com")
+   - record_types: list like ["A", "MX", "NS", "TXT"]
+
+5. reverse_lookup_whois(query) - WHOIS lookup
+   - query: domain or IP address
+
+## OSINT
+6. osint_ip_lookup(ip) - IP geolocation and info
+7. osint_domain_lookup(domain) - Domain WHOIS info
+
+## Generic
+8. run_cli(cmd) - Execute a general CLI command (avoid sudo)
+9. finish(answer) - Complete the task with final answer
+
 RULES:
-- If planner wants to run a general command, use run_cli
-- If planner wants network scanning/discovery, use network_discovery_nmap
-- If planner provides a final answer, use finish
-- Extract exact parameters from the planner's text
-
-For network_discovery_nmap:
-- target: IP or CIDR (e.g., "192.168.1.0/24", "10.0.0.1")
-- ports: port range (default "1-1024")
-- ping_only: true for host discovery only
-- timing: T0-T5 (default T3)
-
-IMPORTANT: Call exactly ONE tool per decision."""),
+- PREFER specialized tools over run_cli for network tasks
+- For network scanning: use network_discovery_nmap (NOT raw nmap commands)
+- For host discovery: use network_discovery_nmap with ping_only=true
+- AVOID sudo commands - tools handle permissions internally
+- If task is complete, use finish with the results
+- Call exactly ONE tool per decision"""),
     ("human", "Planner decision: {input}"),
     ("placeholder", "{agent_scratchpad}"),
 ])
