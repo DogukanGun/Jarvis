@@ -18,7 +18,6 @@ import os
 import uvicorn
 from contextlib import contextmanager
 from fastapi import FastAPI, Query
-from typing import Optional
 
 app = FastAPI(title="Vulnerable Test App", description="FOR TESTING ONLY")
 
