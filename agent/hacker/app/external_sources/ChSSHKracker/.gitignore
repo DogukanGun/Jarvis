@@ -1,0 +1,29 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+*.pyzw
+*.pyzwz
+*.pyzwzw
+*.pyzwzwz
+# Virtual Env and Vs code configs
+venv/
+.vscode/
+# New Version of Script Directorys
+data/
+log/
+tests/
+lib/
+bin/
+# Tests Files
+TODO.txt
+ips.txt
+passwd.txt
+users.txt
+scanned.txt
+CIDR.txt
+ssh_advanced.py
+ssh.py
