@@ -1,0 +1,60 @@
+// Prisma Schema for Observation Hub
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Connected agent instance
+model Agent {
+  id        String   @id
+  name      String?
+  status    String   @default("online")
+  lastSeen  DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  tasks Task[]
+
+  @@map("agents")
+}
+
+/// Task executed by an agent
+model Task {
+  id          String    @id @default(uuid())
+  agentId     String
+  agent       Agent     @relation(fields: [agentId], references: [id])
+  description String
+  status      String    @default("pending")
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  result      String?   @db.Text
+  error       String?   @db.Text
+
+  events Event[]
+
+  @@index([agentId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("tasks")
+}
+
+/// Event emitted during task execution
+model Event {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  type      String
+  data      Json
+  timestamp DateTime @default(now())
+
+  @@index([taskId])
+  @@index([type])
+  @@index([timestamp])
+  @@map("events")
+}

@@ -17,6 +17,7 @@ import type {
 import { taskManager } from './task-manager.js';
 import { wrapperService } from './wrapper.js';
 import { setupSSE, setupSSEKeepalive } from './utils/sse.js';
+import { initializeGateway, getGateway, getAgentId } from './gateway/index.js';
 
 /**
  * HTTP server with REST API and SSE for Qwen Code wrapper
@@ -57,6 +58,19 @@ export default class WrapperServer {
         status: 'ok',
         timestamp: Date.now(),
         activeTasks: taskManager.getActiveTasks().length,
+      });
+    });
+
+    // Agent info endpoint
+    this.app.get('/api/agent/info', (_req, res) => {
+      const gateway = getGateway();
+      res.json({
+        agentId: getAgentId(),
+        status: 'online',
+        connectedToHub: gateway?.isConnected() ?? false,
+        activeTasks: taskManager.getActiveTasks().length,
+        totalTasks: taskManager.getAllTasks().length,
+        timestamp: Date.now(),
       });
     });
 
@@ -272,6 +286,34 @@ export default class WrapperServer {
         console.log(`Qwen Code HTTP Wrapper listening on port ${this.port}`);
         console.log(`Health check: http://localhost:${this.port}/health`);
         console.log(`API base URL: http://localhost:${this.port}/api`);
+
+        // Initialize WebSocket gateway if hub URL is configured
+        const hubUrl = process.env['OBSERVATION_HUB_URL'];
+        const agentId = process.env['AGENT_ID'] || `qwen-${this.port}`;
+        const agentName = process.env['AGENT_NAME'];
+
+        if (hubUrl) {
+          console.log(`Connecting to observation hub at ${hubUrl}`);
+          const gateway = initializeGateway({
+            hubUrl,
+            agentId,
+            agentName,
+          });
+
+          // Setup callbacks for hub messages
+          gateway.onAnswerReceived = (taskId: string, answer: string) => {
+            taskManager.answerQuestion(taskId, answer);
+          };
+
+          gateway.onCancelReceived = (taskId: string) => {
+            taskManager.cancelTask(taskId);
+          };
+
+          gateway.connect();
+        } else {
+          console.log('OBSERVATION_HUB_URL not set, running in standalone mode');
+        }
+
         resolve();
       });
     });
@@ -285,6 +327,12 @@ export default class WrapperServer {
       if (!this.server) {
         resolve();
         return;
+      }
+
+      // Disconnect from observation hub
+      const gateway = getGateway();
+      if (gateway) {
+        gateway.disconnect();
       }
 
       // Shutdown task manager

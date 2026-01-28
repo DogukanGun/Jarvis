@@ -1,48 +1,25 @@
-# Build stage  
-FROM golang:1.24-alpine AS builder
+FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install git and other dependencies
-RUN apk add --no-cache git
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy root go.mod and go.sum (from project root, one level up from agent/)
-COPY ../go.mod ../go.sum ./
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy agent go.mod and go.sum (from agent/ directory - build context)
-COPY go.mod go.sum ./agent/
-
-# Copy agent source code (from agent/ directory - build context)
-COPY . ./agent/
-
-# Download dependencies from agent directory
-WORKDIR /app/agent
-RUN go mod download
-
-# Build the general agent HTTP server
-WORKDIR /app/agent/general
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o agent-http .
-
-# Runtime stage
-FROM alpine:latest
-
-# Install runtime dependencies for agent tools
-RUN apk --no-cache add ca-certificates python3 nodejs npm bash git curl
-
-WORKDIR /root/
-
-# Copy the binary from builder stage
-COPY --from=builder /app/agent/general/agent-http .
-
-# Copy agent tools and utilities from build context 
-COPY tools ./tools
+# Copy application code
+COPY app ./app
 
 # Expose port
 EXPOSE 8080
 
 # Set environment variables
-ENV AGENT_MODE=http
 ENV PORT=8080
+ENV HOST=0.0.0.0
 
-# Run the agent HTTP server
-CMD ["./agent-http"]
+# Run the FastAPI server
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
