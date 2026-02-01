@@ -25,12 +25,12 @@ type MessageResponse struct {
 
 func NewAgentServer(userID string) (*AgentServer, error) {
 	config := AgentConfig{
-		UserID:      userID,
-		OllamaHost:  getEnvOrDefault("OLLAMA_HOST", "http://ollama:11434"),
-		OllamaModel: getEnvOrDefault("OLLAMA_MODEL", "llama3.2"),
-		Neo4jURI:    getEnvOrDefault("NEO4J_URI", "bolt://neo4j:7687"),
-		Neo4jUser:   getEnvOrDefault("NEO4J_USER", "neo4j"),
-		Neo4jPass:   getEnvOrDefault("NEO4J_PASSWORD", "jarvispassword"),
+		UserID:            userID,
+		OllamaHost:        getEnvOrDefault("OLLAMA_HOST", "http://ollama:11434"),
+		OllamaModel:       getEnvOrDefault("OLLAMA_MODEL", "llama3.2"),
+		EpisodicMemoryURL: getEnvOrDefault("EPISODIC_MEMORY_URL", "http://episodic-memory:8085"),
+		GUIAgentURL:       getEnvOrDefault("GUI_AGENT_URL", "http://agent-gui:8080"),
+		VisualAnalyserURL: getEnvOrDefault("VISUAL_ANALYSER_URL", "http://visual-analyser:8080"),
 	}
 
 	jarvisAgent, err := NewJarvisAgent(config)

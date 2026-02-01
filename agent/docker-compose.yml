@@ -103,7 +103,7 @@ services:
       timeout: 10s
       retries: 5
 
-  # Jarvis General Agent Service
+  # Jarvis General Agent Service (Orchestrator)
   agent-general:
     build:
       context: .
@@ -115,25 +115,23 @@ services:
       - OLLAMA_HOST=http://ollama:11434
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
       - AGENT_MODE=http
-      - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USER=neo4j
-      - NEO4J_PASSWORD=jarvispassword
       - USER_ID=${USER_ID:-default}
       - KAFKA_BROKERS=kafka:29092
+      - EPISODIC_MEMORY_URL=http://episodic-memory:8085
+      - GUI_AGENT_URL=http://agent-gui:8080
+      - VISUAL_ANALYSER_URL=http://visual-analyser:8080
     depends_on:
-      postgres:
-        condition: service_healthy
-      neo4j:
-        condition: service_healthy
       kafka:
         condition: service_healthy
       ollama:
+        condition: service_healthy
+      episodic-memory:
         condition: service_healthy
     networks:
       - jarvis-network
     restart: unless-stopped
 
-  # Jarvis Router Agent Service
+  # Jarvis Router Service (Simple passthrough to General Agent)
   agent-router:
     build:
       context: .
@@ -145,13 +143,12 @@ services:
       - AGENT_MODE=http
       - KAFKA_BROKERS=kafka:29092
       - USER_ID=${USER_ID:-default}
-      - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_TEST_MODEL=llama3.2
+      - GENERAL_AGENT_URL=http://agent-general:8080
     depends_on:
       kafka:
         condition: service_healthy
-      ollama:
-        condition: service_healthy
+      agent-general:
+        condition: service_started
     networks:
       - jarvis-network
     restart: unless-stopped
@@ -230,6 +227,38 @@ services:
       retries: 5
       start_period: 15s
 
+  # Jarvis Episodic Memory Service
+  episodic-memory:
+    build:
+      context: .
+      dockerfile: ./memory/episodic/Dockerfile
+    container_name: jarvis-episodic-memory
+    ports:
+      - "8085:8085"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8085
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - LLM_MODEL=llama3.2
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SQLITE_DB_PATH=/data/jarvis_episodes.db
+    volumes:
+      - episodic_data:/data
+    depends_on:
+      kafka:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8085/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
 volumes:
   neo4j_data:
     driver: local
@@ -242,6 +271,8 @@ volumes:
   postgres_data:
     driver: local
   ollama_data:
+    driver: local
+  episodic_data:
     driver: local
 
 networks:
