@@ -87,6 +87,17 @@ func main() {
 
 	server := NewVisualAnalyserServer()
 
+	// Initialize Kafka consumer if enabled
+	var kafkaConsumer *KafkaConsumer
+	if os.Getenv("ENABLE_GROUP_LAYER") == "true" {
+		vision := NewVisionService()
+		var err error
+		kafkaConsumer, err = StartKafkaConsumer(vision)
+		if err != nil {
+			log.Printf("Warning: failed to initialize Kafka consumer: %v", err)
+		}
+	}
+
 	// Setup routes
 	http.HandleFunc("/analyze", server.handleAnalyze)
 	http.HandleFunc("/health", server.handleHealth)
@@ -113,6 +124,10 @@ func main() {
 	log.Printf("  POST /analyze       - Analyze screenshot")
 	log.Printf("  GET  /health        - Health check")
 	log.Printf("  GET  /capabilities  - Get capabilities")
+
+	if kafkaConsumer != nil {
+		log.Println("Kafka consumer enabled for group layer communication")
+	}
 
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatalf("Server failed to start: %v", err)

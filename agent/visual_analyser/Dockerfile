@@ -1,31 +1,30 @@
+# Visual Analyser Dockerfile
 FROM golang:1.24-alpine AS builder
 
-WORKDIR /build
+WORKDIR /app
 
-# Copy go mod files
-COPY go.mod ./
+# Copy Go modules
+COPY go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
 
-# Copy source code
+# Copy all source code
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o visual-analyser .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o visual-analyser ./visual_analyser
 
 # Final stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates curl
 
-WORKDIR /app
+WORKDIR /root/
 
-# Copy binary from builder
-COPY --from=builder /build/visual-analyser .
+# Copy the binary from builder
+COPY --from=builder /app/visual-analyser .
 
-# Expose port
-EXPOSE 8080
+EXPOSE 8081
 
-# Run the application
 CMD ["./visual-analyser"]

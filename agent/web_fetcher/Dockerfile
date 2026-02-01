@@ -1,16 +1,17 @@
-# Playwright Python image includes browser deps; we add app deps and ensure Chromium
-FROM mcr.microsoft.com/playwright/python:v1.57.0-noble
+# Web Fetcher Dockerfile
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install app dependencies and Chromium
+# Copy requirements
 COPY requirements.txt .
+
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
-RUN playwright install chromium
 
 # Copy application code
-COPY main.py crawler_service.py ./
+COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "main.py"]

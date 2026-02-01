@@ -1,0 +1,254 @@
+version: '3.8'
+
+# Master Docker Compose for entire Jarvis Group Communication Layer
+# Run from this directory: docker-compose up
+
+services:
+  # ============================================================================
+  # INFRASTRUCTURE SERVICES
+  # ============================================================================
+
+  # Zookeeper (required for Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kafka Message Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # AGENT SERVICES
+  # ============================================================================
+
+  # Router Service (Go)
+  router:
+    build:
+      context: ./agent
+      dockerfile: router/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      ENABLE_GROUP_LAYER: "true"
+      GROUP_ID: jarvis-main
+      KAFKA_BROKERS: kafka:9092
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: jarvis
+      MINIO_USE_SSL: "false"
+      OLLAMA_HOST: http://ollama:11434
+      ADMIN_ID: orchestrator
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jarvis-network
+
+  # General Agent (Python)
+  general-agent:
+    build:
+      context: ./agent/general
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8080"
+    environment:
+      ENABLE_GROUP_LAYER: "true"
+      GROUP_ID: jarvis-main
+      AGENT_ID: general-agent
+      KAFKA_BROKERS: kafka:9092
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command: python app/main.py
+    networks:
+      - jarvis-network
+
+  # Kafka Consumer for General Agent
+  general-kafka-consumer:
+    build:
+      context: ./agent/general
+      dockerfile: Dockerfile
+    environment:
+      GROUP_ID: jarvis-main
+      AGENT_ID: general-agent
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command: python app/kafka_consumer.py
+    networks:
+      - jarvis-network
+
+  # Visual Analyser (Go)
+  visual-analyser:
+    build:
+      context: ./agent
+      dockerfile: visual_analyser/Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      PORT: 8081
+      ENABLE_GROUP_LAYER: "true"
+      GROUP_ID: jarvis-main
+      AGENT_ID: visual-analyser
+      KAFKA_BROKERS: kafka:9092
+      VISION_MODEL: llama3.2-vision
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+
+  # Web Fetcher (Python)
+  web-fetcher:
+    build:
+      context: ./agent/web_fetcher
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8000"
+    environment:
+      ENABLE_GROUP_LAYER: "true"
+      GROUP_ID: jarvis-main
+      AGENT_ID: web-fetcher
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command: python main.py
+    networks:
+      - jarvis-network
+
+  # Kafka Consumer for Web Fetcher
+  web-fetcher-kafka-consumer:
+    build:
+      context: ./agent/web_fetcher
+      dockerfile: Dockerfile
+    environment:
+      GROUP_ID: jarvis-main
+      AGENT_ID: web-fetcher
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command: python kafka_consumer.py
+    networks:
+      - jarvis-network
+
+  # ============================================================================
+  # WEB APP SERVICES
+  # ============================================================================
+
+  # Web App Backend (Node.js)
+  web-backend:
+    build:
+      context: ./web_app/backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      ROUTER_URL: http://router:8080
+      KAFKA_BROKERS: kafka:9092
+      GROUP_ID: jarvis-main
+    depends_on:
+      kafka:
+        condition: service_healthy
+      router:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Web App Frontend (React)
+  web-frontend:
+    build:
+      context: ./web_app/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:5000
+    depends_on:
+      - web-backend
+    networks:
+      - jarvis-network
+
+# ============================================================================
+# VOLUMES
+# ============================================================================
+
+volumes:
+  minio-data:
+    driver: local
+  # ollama-data:
+  #   driver: local
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+
+networks:
+  jarvis-network:
+    driver: bridge
