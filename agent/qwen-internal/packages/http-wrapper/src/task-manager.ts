@@ -14,6 +14,7 @@ import type {
   StatusEvent,
 } from './types.js';
 import { broadcastSSEEvent, closeSSE } from './utils/sse.js';
+import { eventBus, getAgentId } from './gateway/index.js';
 
 /**
  * Manages concurrent task executions
@@ -36,10 +37,12 @@ export class TaskManager {
    */
   createTask(task: string, config: WrapperConfig = {}): string {
     const taskId = uuidv4();
+    const agentId = getAgentId();
     const now = Date.now();
 
     const taskState: TaskState = {
       taskId,
+      agentId,
       status: 'pending',
       config,
       task,
@@ -50,6 +53,16 @@ export class TaskManager {
     };
 
     this.tasks.set(taskId, taskState);
+
+    // Emit task_created event to event bus
+    eventBus.emit('task_created', {
+      taskId,
+      agentId,
+      description: task,
+      status: 'pending',
+      createdAt: now,
+    });
+
     return taskId;
   }
 
@@ -85,11 +98,23 @@ export class TaskManager {
       type: 'status',
       timestamp: Date.now(),
       taskId,
+      agentId: task.agentId,
       status,
       message,
     };
 
     this.broadcastEvent(taskId, statusEvent);
+
+    // Emit task_updated event to event bus
+    eventBus.emit('task_updated', {
+      taskId,
+      agentId: task.agentId,
+      status,
+      startedAt: task.startedAt,
+      completedAt: task.completedAt,
+      result: task.result,
+      error: task.error,
+    });
   }
 
   /**
@@ -141,11 +166,21 @@ export class TaskManager {
       return;
     }
 
+    // Ensure event has agentId
+    const eventWithAgent = { ...event, agentId: task.agentId };
+
     // Store event in history
-    task.events.push(event);
+    task.events.push(eventWithAgent);
 
     // Broadcast to all connected clients
-    broadcastSSEEvent(task.sseConnections, event);
+    broadcastSSEEvent(task.sseConnections, eventWithAgent);
+
+    // Emit new_event to event bus for observation hub
+    eventBus.emit('new_event', {
+      taskId,
+      agentId: task.agentId,
+      event: eventWithAgent,
+    });
   }
 
   /**
@@ -273,7 +308,11 @@ export class TaskManager {
       }
     });
 
-    tasksToDelete.forEach((taskId) => this.tasks.delete(taskId));
+    tasksToDelete.forEach((taskId) => {
+      this.tasks.delete(taskId);
+      // Emit task_deleted event to event bus
+      eventBus.emit('task_deleted', taskId);
+    });
 
     if (tasksToDelete.length > 0) {
       console.log(`Cleaned up ${tasksToDelete.length} old tasks`);

@@ -1,0 +1,9 @@
+storage/
+.cursor/
+__pycache__/
+*.pyc
+*.csv
+run.sh
+.env
+.git
+.gitignore

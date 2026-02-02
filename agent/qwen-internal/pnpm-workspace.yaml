@@ -1,5 +1,6 @@
 packages:
   - 'packages/core'
   - 'packages/http-wrapper'
+  - 'packages/observation-hub'
   - 'packages/test-utils'
 

@@ -51,6 +51,7 @@ export interface SSEEvent {
   type: SSEEventType;
   timestamp: number;
   taskId: string;
+  agentId: string;
 }
 
 /**
@@ -144,6 +145,7 @@ export type WrapperSSEEvent =
  */
 export interface TaskState {
   taskId: string;
+  agentId: string;
   status: TaskStatus;
   config: WrapperConfig;
   task: string;
