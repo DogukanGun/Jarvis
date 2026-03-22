@@ -9,6 +9,9 @@ dist/
 build/
 .pytest_cache/
 
+# Claude
+.claude/
+
 # IDEs
 .idea/
 .vscode/
