@@ -1,0 +1,10 @@
+claude-agent-sdk
+anthropic
+tavily-python
+arxiv
+semanticscholar
+pydantic
+python-dotenv
+matplotlib
+fastapi
+uvicorn[standard]

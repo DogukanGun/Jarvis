@@ -21,6 +21,14 @@ Thumbs.db
 
 # Environment
 .env
+.env.*
 venv/
 env/
+.venv/
 node_modules/
+
+# Next.js
+.next/
+
+# Generated outputs
+outputs/
