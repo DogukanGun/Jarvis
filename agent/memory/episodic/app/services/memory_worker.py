@@ -56,6 +56,14 @@ class MemoryWorker:
 
             logger.info(f"Started MemoryWorker with {self.max_workers} workers")
 
+            # Emit monitor event
+            from app.monitor import get_monitor
+            get_monitor().emit("service_status_change", {
+                "service": "memory_worker",
+                "status": "running",
+                "queue_depth": 0,
+            })
+
     def stop(self, timeout: float = 5.0) -> None:
         """
         Stop the worker threads gracefully.
@@ -82,6 +90,14 @@ class MemoryWorker:
             self.workers = []
             logger.info("MemoryWorker stopped")
 
+            # Emit monitor event
+            from app.monitor import get_monitor
+            get_monitor().emit("service_status_change", {
+                "service": "memory_worker",
+                "status": "stopped",
+                "queue_depth": 0,
+            })
+
     def enqueue(self, payload: Dict[str, Any]) -> bool:
         """
         Add a job to the processing queue.
@@ -98,6 +114,15 @@ class MemoryWorker:
 
         try:
             self.job_queue.put(payload, block=False)
+
+            # Emit queue depth update
+            from app.monitor import get_monitor
+            get_monitor().emit("service_status_change", {
+                "service": "memory_worker",
+                "status": "running",
+                "queue_depth": self.job_queue.qsize(),
+            })
+
             return True
         except queue.Full:
             logger.error("Job queue full, dropping job")

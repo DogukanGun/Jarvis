@@ -10,7 +10,7 @@ from typing import Dict, Any, List
 import logging
 from app.shared.types import MainGraphState
 from app.shared.normalize import normalize_mem0_items
-from app.clients.mem0_client import get_mem0_client
+from app.clients.long_term_client import get_long_term_client
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +58,9 @@ def retrieve_episodes(state: MainGraphState) -> Dict[str, Any]:
     )
     all_episodes.extend(sqlite_episodes)
 
-    # 2. Query mem0 for long-term memories
+    # 2. Query long-term memory (Supermemory or Mem0)
     try:
-        client = get_mem0_client()
+        client = get_long_term_client()
         response = client.search(
             user_id=user_id,
             query=retrieval_query,
@@ -69,21 +69,42 @@ def retrieve_episodes(state: MainGraphState) -> Dict[str, Any]:
 
         if response.get("success", True):
             raw_data = response.get("data")
-            mem0_episodes = normalize_mem0_items(raw_data)
-            # Mark as from mem0
-            for ep in mem0_episodes:
-                ep["source"] = "mem0"
-            all_episodes.extend(mem0_episodes)
+            lt_episodes = normalize_mem0_items(raw_data)
+            # Mark source
+            for ep in lt_episodes:
+                ep["source"] = "long_term"
+            all_episodes.extend(lt_episodes)
         else:
-            errors.append(f"Mem0 search: {response.get('message')}")
+            errors.append(f"Long-term memory search: {response.get('message')}")
 
     except Exception as e:
-        errors.append(f"Mem0 error: {str(e)}")
+        errors.append(f"Long-term memory error: {str(e)}")
 
-    # 3. Merge, deduplicate, and rank
+    # 3. Fetch user profile if Supermemory is enabled
+    try:
+        profile = client.get_profile(user_id=user_id, query=retrieval_query)
+        if profile:
+            # Inject static profile facts as high-priority episodes
+            for fact in profile.get("static", []):
+                fact["source"] = "profile_static"
+                fact["score"] = 0.9  # High priority
+                all_episodes.append(fact)
+    except Exception as e:
+        errors.append(f"Profile fetch error: {str(e)}")
+
+    # 4. Merge, deduplicate, and rank
     merged = _merge_and_rank(all_episodes, state, retrieve_limit)
 
     retrieval_error = "; ".join(errors) if errors else None
+
+    # Emit search event for monitoring
+    from app.monitor import get_monitor
+    get_monitor().emit("search_executed", {
+        "graph": "main_graph",
+        "node": "retrieve_episodes",
+        "result_count": len(merged),
+        "sources": list({ep.get("source", "unknown") for ep in merged}),
+    })
 
     return {
         "retrieved_episodes": merged,

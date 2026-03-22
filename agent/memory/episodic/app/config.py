@@ -16,6 +16,17 @@ class Config:
     MEM0_BASE_URL = os.getenv("MEM0_BASE_URL", "http://localhost:8080")
 
     # =========================================================================
+    # Supermemory settings (self-hosted)
+    # =========================================================================
+    SUPERMEMORY_BASE_URL = os.getenv("SUPERMEMORY_BASE_URL", "http://localhost:8787")
+    SUPERMEMORY_API_KEY = os.getenv("SUPERMEMORY_API_KEY", "local-dev-key")
+
+    # =========================================================================
+    # Long-term memory backend selection
+    # =========================================================================
+    LONG_TERM_BACKEND = os.getenv("LONG_TERM_BACKEND", "mem0")  # "mem0" | "supermemory"
+
+    # =========================================================================
     # LLM settings
     # =========================================================================
     LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")  # ollama, openai, mock

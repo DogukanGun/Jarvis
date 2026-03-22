@@ -66,6 +66,15 @@ def redact_secrets(state: MemoryWriteState) -> Dict[str, Any]:
 
     if secrets_found:
         logger.warning(f"Redacted {len(all_redactions)} secrets from candidates")
+        # Emit monitor events for each redacted secret
+        from app.monitor import get_monitor
+        monitor = get_monitor()
+        for r in all_redactions:
+            monitor.emit("secret_redacted", {
+                "graph": "memory_write_graph",
+                "node": "redact_secrets",
+                "pattern_type": r.get("type", "unknown"),
+            })
     else:
         logger.debug("No secrets found in candidates")
 

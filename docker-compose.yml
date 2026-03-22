@@ -40,10 +40,11 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
+      interval: 15s
+      timeout: 15s
+      retries: 10
+      start_period: 30s
 
   # MinIO Object Storage
   minio:
@@ -86,6 +87,7 @@ services:
       MINIO_USE_SSL: "false"
       OLLAMA_HOST: http://ollama:11434
       ADMIN_ID: orchestrator
+      SWISS_KNIFE_BASE_URL: http://swiss-army-knife:8787
     depends_on:
       kafka:
         condition: service_healthy
@@ -188,6 +190,64 @@ services:
       kafka:
         condition: service_healthy
     command: python kafka_consumer.py
+    networks:
+      - jarvis-network
+
+  # ============================================================================
+  # SWISS ARMY KNIFE - Security/Network Tool Agent
+  # ============================================================================
+
+  # Swiss Army Knife HTTP Server
+  swiss-army-knife:
+    build:
+      context: ./agent/swiss-army-knife
+      dockerfile: Dockerfile
+    ports:
+      - "8787:8787"
+    environment:
+      PORT: 8787
+      LLM_PROVIDER: openai
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      KAFKA_BROKERS: kafka:9092
+      GROUP_ID: jarvis-main
+      AGENT_ID: swiss-army-knife
+      ENABLE_GROUP_LAYER: "true"
+      CONFIRMATION_TIMEOUT: 300
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8787/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jarvis-network
+
+  # Swiss Army Knife Kafka Consumer
+  swiss-army-knife-kafka-consumer:
+    build:
+      context: ./agent/swiss-army-knife
+      dockerfile: Dockerfile
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      GROUP_ID: jarvis-main
+      AGENT_ID: swiss-army-knife
+      LLM_PROVIDER: openai
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      ENABLE_GROUP_LAYER: "true"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command: python run_kafka_consumer.py
     networks:
       - jarvis-network
 

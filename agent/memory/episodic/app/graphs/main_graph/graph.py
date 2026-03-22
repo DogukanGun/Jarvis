@@ -94,11 +94,24 @@ def run_main_graph(user_id: str, prompt: str, context: dict = None) -> MainGraph
     Returns:
         Final state after graph execution
     """
+    from app.monitor import get_monitor
+    import time
+
+    monitor = get_monitor()
     initial_state: MainGraphState = {
         "user_id": user_id,
         "prompt": prompt,
         "context": context or {}
     }
 
-    result = main_graph.invoke(initial_state)
-    return result
+    monitor.emit("graph_run_start", {"graph": "main_graph", "user_id": user_id})
+    t0 = time.time()
+
+    try:
+        result = main_graph.invoke(initial_state)
+        duration_ms = round((time.time() - t0) * 1000)
+        monitor.emit("graph_run_end", {"graph": "main_graph", "duration_ms": duration_ms})
+        return result
+    except Exception as e:
+        monitor.emit("graph_run_error", {"graph": "main_graph", "error": str(e)})
+        raise

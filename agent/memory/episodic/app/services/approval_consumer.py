@@ -49,6 +49,12 @@ class ApprovalConsumer:
             self._thread.start()
             logger.info("ApprovalConsumer started")
 
+            from app.monitor import get_monitor
+            get_monitor().emit("service_status_change", {
+                "service": "approval_consumer",
+                "status": "running",
+            })
+
     def stop(self, timeout: float = 5.0) -> None:
         """
         Stop the consumer gracefully.
@@ -67,6 +73,12 @@ class ApprovalConsumer:
                 self._thread = None
 
             logger.info("ApprovalConsumer stopped")
+
+            from app.monitor import get_monitor
+            get_monitor().emit("service_status_change", {
+                "service": "approval_consumer",
+                "status": "stopped",
+            })
 
     def _consume_loop(self) -> None:
         """Main consumer loop - processes Kafka messages."""
@@ -136,6 +148,15 @@ class ApprovalConsumer:
 
             if result.get("completed"):
                 logger.info(f"Approval processed: proposal={proposal_id}, applied={result.get('applied')}")
+
+                # Emit monitor events
+                from app.monitor import get_monitor
+                monitor = get_monitor()
+                event_type = f"promotion_{decision}" if decision in ("approved", "rejected") else "promotion_timeout"
+                monitor.emit(event_type, {
+                    "proposal_id": proposal_id,
+                    "decision": decision,
+                })
             else:
                 logger.warning(f"Approval processing failed: {result.get('errors')}")
 

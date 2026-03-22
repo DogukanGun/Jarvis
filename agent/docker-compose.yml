@@ -79,8 +79,214 @@ services:
       timeout: 10s
       retries: 5
 
+  # Neo4j Graph Database (required by Mem0)
+  neo4j:
+    image: neo4j:5.26.4
+    container_name: jarvis-neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/jarvispassword
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p jarvispassword 'RETURN 1' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Mem0 - Long-term memory API server
+  mem0:
+    image: mem0/mem0-api-server
+    container_name: jarvis-mem0
+    ports:
+      - "8080:8000"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DATABASE_URL: postgresql://jarvis:jarvispassword@postgres:5432/jarvis
+      NEO4J_URL: bolt://neo4j:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: jarvispassword
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ==========================================================================
+  # APPLICATION SERVICES
+  # ==========================================================================
+
+  # Router Agent - Central orchestrator
+  router:
+    build:
+      context: ./router
+      dockerfile: Dockerfile
+    container_name: jarvis-router
+    ports:
+      - "8888:8888"
+    environment:
+      ROUTER_PORT: 8888
+      ROUTER_LLM_PROVIDER: ollama
+      ROUTER_LLM_MODEL: llama3.1:8b
+      OLLAMA_BASE_URL: http://ollama:11434
+      THINKER_BASE_URL: http://thinker:8585
+      WEB_FETCHER_BASE_URL: http://web-fetcher:8000
+      MEMORY_BASE_URL: http://memory:8686
+      SWISS_KNIFE_BASE_URL: http://swiss-army-knife:8787
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  # Swiss Army Knife - Security/network tools agent
+  swiss-army-knife:
+    build:
+      context: ./swiss-army-knife
+      dockerfile: Dockerfile
+    container_name: jarvis-swiss-army-knife
+    ports:
+      - "8789:8787"
+    environment:
+      PORT: 8787
+      LLM_PROVIDER: ollama
+      LLM_MODEL: llama3.1:8b
+      OLLAMA_BASE_URL: http://ollama:11434
+      KAFKA_BROKERS: kafka:29092
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+  # Chat UI - Web interface for the router
+  chat-ui:
+    build:
+      context: ./router/ui
+      dockerfile: Dockerfile
+    container_name: jarvis-chat-ui
+    ports:
+      - "3002:3002"
+    environment:
+      NEXT_PUBLIC_ROUTER_URL: http://localhost:8888
+    depends_on:
+      - router
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  # Thinker Agent - Research pipeline
+  thinker:
+    build:
+      context: ./thinker
+      dockerfile: Dockerfile
+    container_name: jarvis-thinker
+    ports:
+      - "8585:8585"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_BASE_URL: http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  # Thinker Monitor Dashboard
+  thinker-monitor:
+    build:
+      context: ./thinker/monitor
+      dockerfile: Dockerfile
+    container_name: jarvis-thinker-monitor
+    ports:
+      - "3000:3000"
+    depends_on:
+      - thinker
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  # Web Fetcher Agent
+  web-fetcher:
+    build:
+      context: ./web_fetcher
+      dockerfile: Dockerfile
+    container_name: jarvis-web-fetcher
+    ports:
+      - "8000:8000"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  # Memory Agent - Episodic memory system
+  memory:
+    build:
+      context: ./memory/episodic
+      dockerfile: Dockerfile
+    container_name: jarvis-memory
+    ports:
+      - "8686:8686"
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      MEM0_BASE_URL: http://mem0:8000
+      LONG_TERM_BACKEND: mem0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SQLITE_DB_PATH: /data/jarvis_episodes.db
+    volumes:
+      - memory_data:/data
+    depends_on:
+      ollama:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  # Memory Monitor Dashboard
+  memory-monitor:
+    build:
+      context: ./memory/monitor
+      dockerfile: Dockerfile
+    container_name: jarvis-memory-monitor
+    ports:
+      - "3001:3001"
+    depends_on:
+      - memory
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+    driver: local
+  neo4j_data:
+    driver: local
+  memory_data:
     driver: local
 
 networks:

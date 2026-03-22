@@ -31,6 +31,7 @@ def compose_context(state: MainGraphState) -> Dict[str, Any]:
     app = state.get("app")
     entities = state.get("entities", [])
     mem0_state = state.get("mem0_state", {})
+    user_profile = state.get("user_profile")
     retrieved_episodes = state.get("retrieved_episodes", [])
 
     # Import config for limits
@@ -55,6 +56,13 @@ def compose_context(state: MainGraphState) -> Dict[str, Any]:
         },
         "user_prompt": normalized_prompt
     }
+
+    # Inject Supermemory user profile if available
+    if user_profile:
+        llm_context["user_profile"] = {
+            "static_facts": user_profile.get("static", [])[:10],
+            "dynamic_context": user_profile.get("dynamic", [])[:5],
+        }
 
     return {
         "llm_context": llm_context

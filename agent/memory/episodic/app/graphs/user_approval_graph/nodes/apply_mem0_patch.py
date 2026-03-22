@@ -1,14 +1,14 @@
 """
-Apply Mem0 Patch Node
+Apply Long-Term Memory Patch Node
 
-Writes approved memory to mem0 long-term storage.
+Writes approved memory to long-term storage (Supermemory or Mem0).
 """
 
 from typing import Dict, Any
 import logging
 
 from ..state import ApprovalState
-from app.clients.mem0_client import get_mem0_client
+from app.clients.long_term_client import get_long_term_client
 from app.storage import get_episode_repository
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def apply_mem0_patch(state: ApprovalState) -> Dict[str, Any]:
     """
-    Write approved memory to mem0.
+    Write approved memory to long-term storage.
 
     Uses the proposed_value (or edited_value if edited).
     Marks episode as promoted in SQLite.
@@ -25,7 +25,7 @@ def apply_mem0_patch(state: ApprovalState) -> Dict[str, Any]:
         state: Current graph state
 
     Returns:
-        State updates with mem0 write result
+        State updates with write result
     """
     proposal = state.get("proposal", {})
     episode_id = state.get("episode_id") or proposal.get("episode_id")
@@ -39,17 +39,17 @@ def apply_mem0_patch(state: ApprovalState) -> Dict[str, Any]:
         value_to_write = proposal.get("proposed_value")
 
     if not value_to_write or not user_id:
-        logger.error("Missing value or user_id for mem0 write")
+        logger.error("Missing value or user_id for long-term memory write")
         return {
             "mem0_write_success": False,
             "mem0_error": "Missing required data"
         }
 
     try:
-        # Write to mem0
-        mem0_client = get_mem0_client()
+        # Write to long-term memory (Supermemory or Mem0)
+        lt_client = get_long_term_client()
 
-        result = mem0_client.add(
+        result = lt_client.add(
             user_id=user_id,
             text=value_to_write,
             metadata={
@@ -62,22 +62,27 @@ def apply_mem0_patch(state: ApprovalState) -> Dict[str, Any]:
 
         if not result.get("success"):
             error_msg = result.get("message", "Unknown error")
-            logger.error(f"Mem0 write failed: {error_msg}")
+            logger.error(f"Long-term memory write failed: {error_msg}")
             return {
                 "mem0_write_success": False,
                 "mem0_write_result": result,
                 "mem0_error": error_msg
             }
 
-        logger.info(f"Successfully wrote to mem0 for user {user_id}")
+        logger.info(f"Successfully wrote to long-term memory for user {user_id}")
 
         # Mark episode as promoted in SQLite
         if episode_id:
             try:
                 repo = get_episode_repository()
-                repo.update_episode(episode_id, {
-                    "promoted_to_mem0": True
-                })
+                update_fields = {"promoted_to_mem0": True}
+
+                # Store Supermemory external ID if available
+                result_data = result.get("data", {})
+                if result_data and result_data.get("id"):
+                    update_fields["supermemory_id"] = result_data["id"]
+
+                repo.update_episode(episode_id, update_fields)
                 logger.debug(f"Marked episode {episode_id} as promoted")
             except Exception as e:
                 logger.warning(f"Failed to mark episode as promoted: {e}")
@@ -89,7 +94,7 @@ def apply_mem0_patch(state: ApprovalState) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        error_msg = f"Mem0 write error: {str(e)}"
+        error_msg = f"Long-term memory write error: {str(e)}"
         logger.error(error_msg)
         return {
             "mem0_write_success": False,

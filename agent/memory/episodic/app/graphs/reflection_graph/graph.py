@@ -75,11 +75,27 @@ def run_reflection(user_id: str, lookback_days: int = None) -> ReflectionState:
         "errors": []
     }
 
+    from app.monitor import get_monitor
+    import time
+
+    monitor = get_monitor()
+    monitor.emit("graph_run_start", {"graph": "reflection_graph", "user_id": user_id})
+    monitor.emit("reflection_start", {"user_id": user_id, "lookback_days": initial_state["lookback_days"]})
+    t0 = time.time()
+
     try:
         result = reflection_graph.invoke(initial_state)
+        duration_ms = round((time.time() - t0) * 1000)
+        monitor.emit("reflection_end", {
+            "user_id": user_id,
+            "proposals_count": result.get("proposals_count", 0),
+            "duration_ms": duration_ms,
+        })
+        monitor.emit("graph_run_end", {"graph": "reflection_graph", "duration_ms": duration_ms})
         logger.info(f"Reflection completed for user {user_id}: {result.get('proposals_count', 0)} proposals")
         return result
     except Exception as e:
+        monitor.emit("graph_run_error", {"graph": "reflection_graph", "error": str(e)})
         logger.error(f"Reflection error: {str(e)}")
         initial_state["errors"] = [str(e)]
         initial_state["completed"] = True

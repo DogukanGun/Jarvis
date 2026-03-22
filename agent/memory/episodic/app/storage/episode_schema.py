@@ -44,6 +44,11 @@ class Episode(BaseModel):
     # Temporal
     first_seen: datetime = Field(default_factory=datetime.utcnow)
     last_seen: datetime = Field(default_factory=datetime.utcnow)
+    event_date: Optional[datetime] = None  # When the referenced event occurred (vs first_seen = when stored)
+
+    # Relational versioning (inspired by Supermemory knowledge chains)
+    parent_episode_id: Optional[str] = None  # Episode this updates/extends/supersedes
+    relation_type: Optional[str] = None  # 'updates' | 'extends' | 'supersedes' | None
 
     # Embedding (stored as list of floats)
     embedding: Optional[List[float]] = None
@@ -58,6 +63,7 @@ class Episode(BaseModel):
     is_deleted: bool = False
     promoted_to_mem0: bool = False
     promotion_proposal_id: Optional[str] = None
+    supermemory_id: Optional[str] = None  # External ID after promotion to Supermemory
 
     # Audit
     created_at: datetime = Field(default_factory=datetime.utcnow)

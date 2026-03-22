@@ -139,11 +139,22 @@ def run_memory_write_graph(payload: dict) -> MemoryWriteState:
         "errors": []
     }
 
+    from app.monitor import get_monitor
+    import time
+
+    monitor = get_monitor()
+    monitor.emit("graph_run_start", {"graph": "memory_write_graph", "user_id": payload.get("user_id")})
+    t0 = time.time()
+
     try:
         result = memory_write_graph.invoke(initial_state)
+        duration_ms = round((time.time() - t0) * 1000)
+        monitor.emit("graph_run_end", {"graph": "memory_write_graph", "duration_ms": duration_ms})
+        monitor.emit("write_completed", {"latency_ms": duration_ms})
         logger.info(f"Memory write completed for user {payload.get('user_id')}")
         return result
     except Exception as e:
+        monitor.emit("graph_run_error", {"graph": "memory_write_graph", "error": str(e)})
         logger.error(f"Memory write graph error: {str(e)}")
         initial_state["errors"] = [str(e)]
         initial_state["completed"] = False

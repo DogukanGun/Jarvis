@@ -66,6 +66,16 @@ def insert_episode(state: MemoryWriteState) -> Dict[str, Any]:
 
         logger.info(f"Inserted new episode: {episode_id}")
 
+        # Emit monitor event
+        from app.monitor import get_monitor
+        get_monitor().emit("episode_inserted", {
+            "graph": "memory_write_graph",
+            "node": "insert_episode",
+            "episode_id": episode_id,
+            "user_id": user_id,
+            "episode_type": candidate.get("episode_type", "interaction"),
+        })
+
         return {
             "episode_id": episode_id,
             "episode": episode.model_dump(),

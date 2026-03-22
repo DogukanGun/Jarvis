@@ -58,6 +58,14 @@ class ReflectionScheduler:
             self._thread.start()
             logger.info(f"ReflectionScheduler started (interval: {self.interval_hours}h)")
 
+            from app.monitor import get_monitor
+            next_run = datetime.utcnow() + timedelta(seconds=min(60, self.interval_seconds / 10))
+            get_monitor().emit("service_status_change", {
+                "service": "reflection_scheduler",
+                "status": "running",
+                "next_reflection": next_run.isoformat(),
+            })
+
     def stop(self, timeout: float = 5.0) -> None:
         """
         Stop the scheduler gracefully.
@@ -76,6 +84,12 @@ class ReflectionScheduler:
                 self._thread = None
 
             logger.info("ReflectionScheduler stopped")
+
+            from app.monitor import get_monitor
+            get_monitor().emit("service_status_change", {
+                "service": "reflection_scheduler",
+                "status": "stopped",
+            })
 
     def run_now(self, user_ids: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
@@ -112,6 +126,16 @@ class ReflectionScheduler:
                     self._last_run = now
 
                     logger.info(f"Reflection completed: {len(results)} users processed")
+
+                    # Update monitor with next run time
+                    from app.monitor import get_monitor
+                    next_run = now + timedelta(seconds=self.interval_seconds)
+                    get_monitor().emit("service_status_change", {
+                        "service": "reflection_scheduler",
+                        "status": "running",
+                        "last_reflection": now.isoformat(),
+                        "next_reflection": next_run.isoformat(),
+                    })
 
                     # Call completion callback if set
                     if self.on_complete:

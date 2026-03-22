@@ -1,0 +1,28 @@
+# Core
+fastapi>=0.115.0,<1.0
+uvicorn[standard]>=0.32.0,<1.0
+pydantic>=2.0
+
+# LangGraph
+langgraph>=0.0.20
+langchain-core>=0.3.0
+
+# HTTP client
+httpx>=0.24.0
+
+# LLM providers
+openai>=1.0.0
+anthropic>=0.40.0
+
+# Kafka
+kafka-python>=2.0.2
+
+# Security tools (Python-native)
+scapy>=2.5.0
+
+# Utilities
+python-dotenv>=1.0.0
+
+# Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0

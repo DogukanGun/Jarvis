@@ -3,7 +3,7 @@ FROM ubuntu:latest
 
 # Update package lists and install necessary packages including curl for health checks
 RUN apt-get update && \
-    apt-get install -y g++ python3 python3-pip git htop curl wget && \
+    apt-get install -y g++ python3 python3-pip git htop curl wget zstd && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Ollama

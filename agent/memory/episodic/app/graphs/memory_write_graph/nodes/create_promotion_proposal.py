@@ -76,6 +76,17 @@ def create_promotion_proposal(state: MemoryWriteState) -> Dict[str, Any]:
 
         logger.info(f"Created promotion proposal: {proposal_id} for episode {episode_id}")
 
+        # Emit monitor event
+        from app.monitor import get_monitor
+        get_monitor().emit("promotion_proposed", {
+            "graph": "memory_write_graph",
+            "node": "create_promotion_proposal",
+            "proposal_id": proposal_id,
+            "episode_id": episode_id,
+            "user_id": user_id,
+            "confidence": episode.get("confidence", 1.0),
+        })
+
         return {
             "proposal_id": proposal_id,
             "proposal": proposal.model_dump(),

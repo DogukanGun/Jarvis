@@ -40,8 +40,17 @@ def dedupe_lookup(state: MemoryWriteState) -> Dict[str, Any]:
         repo = get_episode_repository()
         existing = repo.get_episode_by_fingerprint(user_id, fingerprint)
 
+        from app.monitor import get_monitor
+        monitor = get_monitor()
+
         if existing:
             logger.info(f"Found duplicate episode: {existing.id} (count={existing.reinforcement_count})")
+            monitor.emit("episode_deduplicated", {
+                "graph": "memory_write_graph",
+                "node": "dedupe_lookup",
+                "existing_episode_id": existing.id,
+                "reinforcement_count": existing.reinforcement_count,
+            })
             return {
                 "existing_episode_id": existing.id,
                 "existing_episode": existing.model_dump(),
