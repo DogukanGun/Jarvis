@@ -5,8 +5,9 @@ import type { AgentStatus } from '../lib/types';
 const API_BASE = process.env.NEXT_PUBLIC_ROUTER_URL || 'http://localhost:8888';
 
 const MONITOR_LINKS = [
-  { name: 'Thinker Monitor', url: 'http://localhost:3000', color: 'text-blue-400' },
+  { name: 'Thinker Monitor', url: 'http://localhost:3006', color: 'text-blue-400' },
   { name: 'Memory Monitor', url: 'http://localhost:3001', color: 'text-purple-400' },
+  { name: 'Swiss Army Knife', url: 'http://localhost:3003', color: 'text-red-400' },
 ];
 
 export default function Sidebar() {

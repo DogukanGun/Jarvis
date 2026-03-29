@@ -8,6 +8,7 @@ class ExecuteRequest(BaseModel):
     message: str
     target_tools: Optional[List[str]] = None
     parameters: Optional[Dict[str, Any]] = None
+    confirmed: bool = False
 
 
 class ExecuteResponse(BaseModel):

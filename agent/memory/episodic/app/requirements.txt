@@ -8,6 +8,10 @@ pydantic>=2.0.0            # Data validation and schemas
 langgraph>=0.0.20
 langchain-core<1.0.0,>=0.3.0
 
+# Web server
+fastapi>=0.100.0
+uvicorn>=0.23.0
+
 # Kafka for async communication
 kafka-python>=2.0.2        # Kafka producer/consumer
 

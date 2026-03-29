@@ -10,6 +10,9 @@ from .episode_schema import (
     EpisodeCandidate,
     PromotionProposal,
     UserDecision,
+    EpisodeQuery,
+    EpisodeSearchResult,
+    EpisodeSearchResponse,
 )
 from .episode_repository import EpisodeRepository, get_episode_repository
 from .fingerprint import generate_fingerprint
@@ -20,6 +23,9 @@ __all__ = [
     "EpisodeCandidate",
     "PromotionProposal",
     "UserDecision",
+    "EpisodeQuery",
+    "EpisodeSearchResult",
+    "EpisodeSearchResponse",
     "EpisodeRepository",
     "get_episode_repository",
     "generate_fingerprint",

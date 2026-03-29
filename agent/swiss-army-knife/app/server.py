@@ -1,8 +1,14 @@
 """Swiss Army Knife - FastAPI Server."""
 
+import asyncio
+import json
 import logging
+from collections import deque
+from datetime import datetime, timezone
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from app.config import config
 from app.models import (
@@ -44,6 +50,24 @@ app.add_middleware(
 )
 
 
+# ---------------------------------------------------------------------------
+# SSE broadcast infrastructure
+# ---------------------------------------------------------------------------
+_event_subscribers: list[asyncio.Queue] = []
+_event_history: deque = deque(maxlen=500)
+
+
+def broadcast_event(event: dict):
+    """Push an event to all connected SSE clients and history buffer."""
+    event.setdefault("timestamp", datetime.now(timezone.utc).isoformat())
+    _event_history.append(event)
+    for queue in list(_event_subscribers):
+        try:
+            queue.put_nowait(event)
+        except asyncio.QueueFull:
+            pass
+
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "agent": config.AGENT_ID}
@@ -58,8 +82,12 @@ async def list_tools():
 
 @app.post("/api/execute", response_model=ExecuteResponse)
 async def execute(req: ExecuteRequest):
-    """Execute the tool graph synchronously."""
+    """Execute the tool graph synchronously, tracking via job_store for dashboard visibility."""
     from app.graphs.tool_graph import run_tool_graph
+    from app.services.job_store import job_store
+
+    job_id = job_store.create_job(tool_name="graph", metadata={"message": req.message})
+    job_store.update_status(job_id, "running")
 
     try:
         result = await run_tool_graph(
@@ -67,25 +95,31 @@ async def execute(req: ExecuteRequest):
             message=req.message,
             target_tools=req.target_tools,
             parameters=req.parameters,
+            confirmed=req.confirmed,
+            job_id=job_id,
         )
 
         if result.get("requires_confirmation") and not result.get("confirmed"):
+            job_store.update_status(job_id, "waiting_confirmation")
             return ExecuteResponse(
                 response="Confirmation required before execution.",
                 requires_confirmation=True,
                 confirmation_prompt=result.get("confirmation_prompt", ""),
-                job_id=result.get("job_id"),
+                job_id=job_id,
             )
+
+        job_store.complete_job(job_id, result)
 
         return ExecuteResponse(
             response=result.get("response", ""),
             report=result.get("report", {}),
             tools_used=result.get("tools_used", []),
             findings=result.get("findings", []),
-            job_ids=result.get("job_ids", []),
+            job_ids=[job_id],
         )
     except Exception as e:
         logger.error(f"Execute error: {e}")
+        job_store.fail_job(job_id, str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -96,22 +130,60 @@ async def execute_async(req: ExecuteRequest):
     import asyncio
 
     job_id = job_store.create_job(tool_name="graph", metadata={"message": req.message})
+    job_store.update_status(job_id, "running")
 
     async def _run():
-        from app.graphs.tool_graph import run_tool_graph
-
         try:
+            from app.graphs.tool_graph import run_tool_graph  # inside try so import errors are caught
             result = await run_tool_graph(
                 user_id=req.user_id,
                 message=req.message,
                 target_tools=req.target_tools,
                 parameters=req.parameters,
+                confirmed=req.confirmed,
+                job_id=job_id,
             )
             job_store.complete_job(job_id, result)
+
+            # Publish to Kafka so the router gets the result without polling
+            try:
+                from app.kafka.producer import SwissKnifeProducer
+                producer = SwissKnifeProducer()
+                producer.publish_task_completed(
+                    task_id=job_id,
+                    result=result,
+                    thread_id=job_id,
+                )
+                producer.publish_scan_result(
+                    task_id=job_id,
+                    findings=result.get("findings", []),
+                    tools_used=result.get("tools_used", []),
+                    thread_id=job_id,
+                )
+                producer.close()
+            except Exception as kafka_err:
+                logger.warning("Failed to publish job %s result to Kafka: %s", job_id, kafka_err)
+
         except Exception as e:
+            logger.exception("Async job %s failed: %s", job_id, e)
             job_store.fail_job(job_id, str(e))
 
-    asyncio.create_task(_run())
+            try:
+                from app.kafka.producer import SwissKnifeProducer
+                producer = SwissKnifeProducer()
+                producer.publish_task_failed(task_id=job_id, error=str(e), thread_id=job_id)
+                producer.close()
+            except Exception as kafka_err:
+                logger.warning("Failed to publish job %s failure to Kafka: %s", job_id, kafka_err)
+
+    def _on_task_done(t: asyncio.Task) -> None:
+        if not t.cancelled() and t.exception():
+            exc = t.exception()
+            logger.error("Async task for job %s raised unhandled exception: %s", job_id, exc)
+            job_store.fail_job(job_id, str(exc))
+
+    task = asyncio.create_task(_run())
+    task.add_done_callback(_on_task_done)
     return AsyncExecuteResponse(
         job_id=job_id,
         status="started",
@@ -174,3 +246,42 @@ async def send_session_command(job_id: str, req: CommandRequest):
     if result is None:
         raise HTTPException(status_code=404, detail="Session not found")
     return CommandResponse(output=result, success=True)
+
+
+@app.get("/api/jobs")
+async def list_all_jobs(status: str = None):
+    """List all jobs, optionally filtered by status."""
+    from app.services.job_store import job_store
+
+    jobs = job_store.list_jobs(status=status)
+    return {"jobs": jobs, "total": len(jobs)}
+
+
+@app.get("/api/events")
+async def sse_events():
+    """Server-Sent Events stream for real-time monitoring."""
+    queue: asyncio.Queue = asyncio.Queue(maxsize=256)
+    _event_subscribers.append(queue)
+
+    async def event_generator():
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30)
+                    yield f"data: {json.dumps(event, default=str)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        finally:
+            _event_subscribers.remove(queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
+@app.get("/api/events/history")
+async def event_history():
+    """Return recent event history for initial page load."""
+    return list(_event_history)

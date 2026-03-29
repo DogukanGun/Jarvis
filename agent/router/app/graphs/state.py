@@ -11,7 +11,7 @@ class RouterGraphState(TypedDict, total=False):
     conversation_history: List[Dict[str, Any]]
 
     # Classification
-    intent: str  # "chat" | "research" | "web_fetch"
+    intent: str  # "chat" | "research" | "web_fetch" | "security"
     tool_args: Dict[str, Any]
 
     # Memory
@@ -21,6 +21,10 @@ class RouterGraphState(TypedDict, total=False):
     # Tool results
     tool_results: Dict[str, Any]
     tools_used: List[str]
+
+    # Detailed tool output (populated by security / swiss-knife path)
+    findings: List[Dict[str, Any]]
+    report: Dict[str, Any]
 
     # Output
     response: str

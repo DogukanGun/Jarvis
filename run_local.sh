@@ -1,0 +1,315 @@
+#!/usr/bin/env bash
+# =============================================================================
+#  Jarvis – Local macOS Run Script
+#  Keeps Kafka/MinIO/Ollama in Docker, runs all agents natively so scapy
+#  gets direct access to the host network interfaces.
+# =============================================================================
+set -uo pipefail
+
+# ── Colors ────────────────────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+BLUE='\033[0;34m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="$ROOT/logs"
+mkdir -p "$LOG_DIR"
+
+# ── PID tracking ──────────────────────────────────────────────────────────────
+PIDS=()       # regular background pids
+SUDO_PIDS=()  # sudo pids (need sudo kill)
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+info()    { echo -e "${BLUE}[•]${NC} $*"; }
+ok()      { echo -e "${GREEN}[✓]${NC} $*"; }
+warn()    { echo -e "${YELLOW}[!]${NC} $*"; }
+die()     { echo -e "${RED}[✗]${NC} $*"; exit 1; }
+
+wait_for_port() {
+    local name=$1 port=$2 max=${3:-45}
+    local i=0
+    printf "${BLUE}[•]${NC} Waiting for %-30s" "$name..."
+    while ! nc -z localhost "$port" 2>/dev/null; do
+        sleep 1; i=$((i+1))
+        if [ $i -ge $max ]; then
+            echo -e " ${YELLOW}timeout${NC}"
+            warn "  $name not ready on :$port after ${max}s — check logs/$name.log"
+            return 1
+        fi
+    done
+    echo -e " ${GREEN}:$port${NC}"
+}
+
+# ── Cleanup ───────────────────────────────────────────────────────────────────
+cleanup() {
+    echo ""
+    warn "Shutting down all services..."
+    for pid in "${PIDS[@]}"; do
+        kill "$pid" 2>/dev/null || true
+    done
+    for pid in "${SUDO_PIDS[@]}"; do
+        sudo kill "$pid" 2>/dev/null || true
+    done
+    wait 2>/dev/null || true
+    info "Stopping Docker infrastructure..."
+    cd "$ROOT" && docker compose stop zookeeper kafka minio ollama 2>/dev/null || true
+    ok "All stopped. Logs saved in ./logs/"
+}
+trap cleanup SIGINT SIGTERM EXIT
+
+# =============================================================================
+#  HEADER
+# =============================================================================
+echo -e "${BOLD}${CYAN}"
+echo "  ╔════════════════════════════════════════╗"
+echo "  ║        Jarvis – Local macOS Run        ║"
+echo "  ╚════════════════════════════════════════╝"
+echo -e "${NC}"
+
+# =============================================================================
+#  PREREQUISITES
+# =============================================================================
+info "Checking prerequisites..."
+for cmd in python3 node npm docker nc; do
+    command -v "$cmd" &>/dev/null || die "Missing required tool: $cmd"
+done
+ok "python3 $(python3 --version 2>&1 | cut -d' ' -f2)  |  node $(node --version)  |  npm $(npm --version)"
+
+# =============================================================================
+#  ENVIRONMENT
+# =============================================================================
+# Load .env if present
+if [ -f "$ROOT/.env" ]; then
+    set -a; source "$ROOT/.env"; set +a
+    ok "Loaded .env"
+fi
+
+[ -z "${OPENAI_API_KEY:-}" ] && die "OPENAI_API_KEY is not set. Add it to .env or: export OPENAI_API_KEY=sk-..."
+OPENAI_MODEL="${OPENAI_MODEL:-gpt-4o}"
+
+# Shared env for all local services
+export KAFKA_BROKERS="localhost:9094"
+export MINIO_ENDPOINT="localhost:9000"
+export MINIO_ACCESS_KEY="minioadmin"
+export MINIO_SECRET_KEY="minioadmin"
+export MINIO_BUCKET="jarvis"
+export MINIO_USE_SSL="false"
+export OLLAMA_HOST="http://localhost:11434"
+export LLM_PROVIDER="openai"
+export OPENAI_API_KEY="$OPENAI_API_KEY"
+export OPENAI_MODEL="$OPENAI_MODEL"
+export ENABLE_GROUP_LAYER="true"
+export GROUP_ID="jarvis-main"
+
+# Inter-service URLs (all on localhost now)
+export SWISS_KNIFE_BASE_URL="http://localhost:8787"
+export THINKER_BASE_URL="http://localhost:8585"
+export MEMORY_BASE_URL="http://localhost:8686"
+export WEB_FETCHER_BASE_URL="http://localhost:8099"
+export NEXT_PUBLIC_ROUTER_URL="http://localhost:8888"
+
+# =============================================================================
+#  DOCKER INFRASTRUCTURE (Kafka, MinIO, Ollama only)
+# =============================================================================
+info "Stopping any running agent containers (keeping infra)..."
+cd "$ROOT"
+docker compose stop \
+    router swiss-army-knife swiss-army-knife-kafka-consumer \
+    web-fetcher web-fetcher-kafka-consumer thinker memory-worker \
+    router-ui thinker-monitor memory-monitor swiss-army-knife-monitor \
+    2>/dev/null || true
+
+info "Starting Docker infrastructure (Kafka, MinIO, Ollama)..."
+docker compose up -d zookeeper kafka minio ollama 2>/dev/null
+
+info "Waiting for Kafka broker..."
+until docker compose exec -T kafka \
+    kafka-broker-api-versions --bootstrap-server localhost:9092 &>/dev/null; do
+    sleep 3
+done
+ok "Kafka ready"
+
+# =============================================================================
+#  VENV HELPER
+# =============================================================================
+setup_venv() {
+    local dir=$1 req=$2
+    local venv="$dir/.venv"
+    if [ ! -d "$venv" ]; then
+        info "  Creating venv for $(basename "$dir")..."
+        python3 -m venv "$venv"
+    fi
+    info "  Installing deps for $(basename "$dir") (this may take a minute on first run)..."
+    "$venv/bin/pip" install -q --upgrade pip
+    "$venv/bin/pip" install -q -r "$req"
+    ok "  $(basename "$dir") deps ready"
+}
+
+# =============================================================================
+#  PYTHON SERVICES
+# =============================================================================
+echo ""
+echo -e "${BOLD}── Python services ──────────────────────────────────${NC}"
+
+# 1. Memory Worker
+DIR="$ROOT/agent/memory/episodic"
+setup_venv "$DIR" "$DIR/app/requirements.txt"
+info "Starting memory-worker..."
+( cd "$DIR" && AGENT_ID=memory-worker PORT=8686 \
+    "$DIR/.venv/bin/python" run_server.py ) \
+    > "$LOG_DIR/memory-worker.log" 2>&1 &
+PIDS+=($!)
+
+# 2. Web Fetcher
+DIR="$ROOT/agent/web_fetcher"
+setup_venv "$DIR" "$DIR/requirements.txt"
+info "Installing playwright browsers (first run only)..."
+"$DIR/.venv/bin/python" -m playwright install chromium --quiet 2>/dev/null || true
+info "Starting web-fetcher..."
+( cd "$DIR" && AGENT_ID=web-fetcher PORT=8099 \
+    "$DIR/.venv/bin/python" -m uvicorn main:app \
+    --host 0.0.0.0 --port 8099 ) \
+    > "$LOG_DIR/web-fetcher.log" 2>&1 &
+PIDS+=($!)
+
+# 3. Web Fetcher Kafka Consumer
+info "Starting web-fetcher-kafka-consumer..."
+( cd "$DIR" && AGENT_ID=web-fetcher \
+    "$DIR/.venv/bin/python" run_kafka_consumer.py ) \
+    > "$LOG_DIR/web-fetcher-kafka-consumer.log" 2>&1 &
+PIDS+=($!)
+
+# 4. Thinker
+DIR="$ROOT/agent/thinker"
+setup_venv "$DIR" "$DIR/requirements.txt"
+info "Starting thinker..."
+( cd "$DIR" && AGENT_ID=thinker PORT=8585 \
+    "$DIR/.venv/bin/python" -m src.server ) \
+    > "$LOG_DIR/thinker.log" 2>&1 &
+PIDS+=($!)
+
+# 5. Router
+DIR="$ROOT/agent/router"
+setup_venv "$DIR" "$DIR/requirements.txt"
+info "Starting router..."
+( cd "$DIR" && AGENT_ID=router PORT=8888 ENABLE_KAFKA_CONSUMER=true \
+    "$DIR/.venv/bin/python" -m uvicorn app.server:app \
+    --host 0.0.0.0 --port 8888 ) \
+    > "$LOG_DIR/router.log" 2>&1 &
+PIDS+=($!)
+
+# 6. Face API
+DIR="$ROOT/agent/face"
+setup_venv "$DIR" "$DIR/requirements.txt"
+info "Starting face-api..."
+( cd "$DIR" && AGENT_ID=face-api PORT=8400 \
+    "$DIR/.venv/bin/python" run_server.py ) \
+    > "$LOG_DIR/face-api.log" 2>&1 &
+PIDS+=($!)
+
+# 7. Swiss Army Knife — needs sudo so scapy can open raw sockets
+DIR="$ROOT/agent/swiss-army-knife"
+setup_venv "$DIR" "$DIR/requirements.txt"
+info "Starting swiss-army-knife ${YELLOW}(sudo required for scapy)${NC}..."
+( cd "$DIR" && sudo -E \
+    OPENAI_API_KEY="$OPENAI_API_KEY" OPENAI_MODEL="$OPENAI_MODEL" \
+    LLM_PROVIDER=openai KAFKA_BROKERS=localhost:9094 \
+    ENABLE_GROUP_LAYER=true GROUP_ID=jarvis-main \
+    AGENT_ID=swiss-army-knife PORT=8787 CONFIRMATION_TIMEOUT=300 \
+    "$DIR/.venv/bin/python" -m uvicorn app.server:app \
+    --host 0.0.0.0 --port 8787 ) \
+    > "$LOG_DIR/swiss-army-knife.log" 2>&1 &
+SUDO_PIDS+=($!)
+
+# 8. Swiss Army Knife Kafka Consumer — also needs sudo
+info "Starting swiss-army-knife-kafka-consumer ${YELLOW}(sudo)${NC}..."
+( cd "$DIR" && sudo -E \
+    OPENAI_API_KEY="$OPENAI_API_KEY" OPENAI_MODEL="$OPENAI_MODEL" \
+    LLM_PROVIDER=openai KAFKA_BROKERS=localhost:9094 \
+    ENABLE_GROUP_LAYER=true GROUP_ID=jarvis-main \
+    AGENT_ID=swiss-army-knife \
+    "$DIR/.venv/bin/python" run_kafka_consumer.py ) \
+    > "$LOG_DIR/swiss-army-knife-kafka-consumer.log" 2>&1 &
+SUDO_PIDS+=($!)
+
+# ── Wait for Python services ──────────────────────────────────────────────────
+echo ""
+info "Waiting for Python services..."
+wait_for_port "memory-worker"    8686
+wait_for_port "web-fetcher"      8099
+wait_for_port "thinker"          8585
+wait_for_port "router"           8888
+wait_for_port "swiss-army-knife" 8787
+wait_for_port "face-api"         8400
+
+# =============================================================================
+#  NODE.JS UIs
+# =============================================================================
+echo ""
+echo -e "${BOLD}── UI services ──────────────────────────────────────${NC}"
+
+start_ui() {
+    local name=$1 dir=$2 port=$3
+    if [ ! -d "$dir/node_modules" ]; then
+        info "  npm install for $name (first run, may take a while)..."
+        ( cd "$dir" && npm install --silent ) 2>/dev/null
+    fi
+    info "Starting $name on :$port..."
+    ( cd "$dir" && NEXT_PUBLIC_ROUTER_URL="$NEXT_PUBLIC_ROUTER_URL" \
+        npm run dev -- -p "$port" ) \
+        > "$LOG_DIR/$name.log" 2>&1 &
+    PIDS+=($!)
+}
+
+start_ui "router-ui"               "$ROOT/agent/router/ui"                  3002
+start_ui "swiss-army-knife-monitor" "$ROOT/agent/swiss-army-knife/monitor"  3003
+start_ui "thinker-monitor"         "$ROOT/agent/thinker/monitor"            3006
+start_ui "memory-monitor"          "$ROOT/agent/memory/monitor"             3001
+
+# Desktop app (Electron + Vite — opens a native window)
+info "Starting desktop app..."
+DIR="$ROOT/desktop"
+if [ ! -d "$DIR/node_modules" ]; then
+    info "  npm install for desktop (first run, may take a while)..."
+    ( cd "$DIR" && npm install --silent ) 2>/dev/null
+fi
+( cd "$DIR" && npm run dev ) \
+    > "$LOG_DIR/desktop.log" 2>&1 &
+PIDS+=($!)
+
+echo ""
+info "Waiting for UIs (Next.js takes ~10s on first start)..."
+wait_for_port "router-ui"               3002 60
+wait_for_port "swiss-knife-monitor"     3003 60
+wait_for_port "thinker-monitor"         3006 60
+wait_for_port "memory-monitor"          3001 60
+
+# =============================================================================
+#  DONE
+# =============================================================================
+echo ""
+echo -e "${BOLD}${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BOLD}  ✓  Jarvis is running locally on macOS${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e ""
+echo -e "  ${BOLD}Desktop App${NC}          ${CYAN}(Electron window)${NC}"
+echo -e "  ${BOLD}Chat UI${NC}              ${CYAN}http://localhost:3002${NC}"
+echo -e "  ${BOLD}Router API${NC}           ${CYAN}http://localhost:8888${NC}"
+echo -e "  ${BOLD}Face API${NC}             ${CYAN}http://localhost:8400${NC}"
+echo -e "  ${BOLD}Swiss-knife${NC}          ${CYAN}http://localhost:8787${NC}  ${YELLOW}(running as sudo)${NC}"
+echo -e "  ${BOLD}SAK Monitor${NC}          ${CYAN}http://localhost:3003${NC}"
+echo -e "  ${BOLD}Thinker${NC}              ${CYAN}http://localhost:8585${NC}"
+echo -e "  ${BOLD}Thinker Monitor${NC}      ${CYAN}http://localhost:3006${NC}"
+echo -e "  ${BOLD}Memory${NC}               ${CYAN}http://localhost:8686${NC}"
+echo -e "  ${BOLD}Memory Monitor${NC}       ${CYAN}http://localhost:3001${NC}"
+echo -e "  ${BOLD}Web Fetcher${NC}          ${CYAN}http://localhost:8099${NC}"
+echo -e "  ${BOLD}Kafka${NC}                ${CYAN}localhost:9094${NC}"
+echo -e "  ${BOLD}MinIO Console${NC}        ${CYAN}http://localhost:9001${NC}"
+echo -e ""
+echo -e "  Logs: ${YELLOW}./logs/<service>.log${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "  Press ${BOLD}Ctrl+C${NC} to stop everything"
+echo ""
+
+# Keep alive until Ctrl+C
+wait

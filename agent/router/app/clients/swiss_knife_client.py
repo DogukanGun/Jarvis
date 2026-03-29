@@ -22,7 +22,7 @@ class SwissKnifeClient:
         parameters: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Execute security tools via the swiss-army-knife agent."""
-        payload = {"user_id": user_id, "message": message}
+        payload = {"user_id": user_id, "message": message, "confirmed": True}
         if target_tools:
             payload["target_tools"] = target_tools
         if parameters:
@@ -41,7 +41,7 @@ class SwissKnifeClient:
         try:
             resp = self.client.post(
                 f"{self.base_url}/api/execute/async",
-                json={"user_id": user_id, "message": message},
+                json={"user_id": user_id, "message": message, "confirmed": True},
             )
             resp.raise_for_status()
             return resp.json()

@@ -52,6 +52,7 @@ class ScapyTool(BaseTool):
                     type="string",
                     required=True,
                     choices=[
+                        "get_local_network",
                         "arp_scan",
                         "port_scan",
                         "ping",
@@ -59,7 +60,11 @@ class ScapyTool(BaseTool):
                         "sniff",
                         "custom",
                     ],
-                    description="Action to perform.",
+                    description=(
+                        "Action to perform. Use 'get_local_network' first when "
+                        "no specific target is given — it returns the host's real "
+                        "network interfaces and CIDR ranges."
+                    ),
                 ),
                 ToolParameter(
                     name="target",
@@ -131,10 +136,14 @@ class ScapyTool(BaseTool):
             return ToolResult(
                 tool_name="scapy",
                 success=False,
-                error=f"Parameter 'target' is required for action '{action}'.",
+                error=(
+                    f"Parameter 'target' is required for action '{action}'. "
+                    "Call get_local_network first to discover the correct target range."
+                ),
             )
 
         dispatch = {
+            "get_local_network": lambda: self._get_local_network(),
             "arp_scan": lambda: self._arp_scan(target, interface, timeout),
             "port_scan": lambda: self._port_scan(target, ports, timeout),
             "ping": lambda: self._ping(target, timeout),
@@ -163,6 +172,82 @@ class ScapyTool(BaseTool):
     # ------------------------------------------------------------------ #
 
     @staticmethod
+    def _get_local_network() -> str:
+        import ipaddress
+        import re
+        import socket
+        import subprocess
+
+        # Outbound-connect trick: reveals which IP we use to reach the internet
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+        except Exception:
+            local_ip = "127.0.0.1"
+
+        networks: List[Dict[str, Any]] = []
+
+        # Parse ifconfig (macOS) or fall back to ip addr (Linux)
+        for cmd in (["ifconfig"], ["ip", "addr", "show"]):
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                if proc.returncode != 0:
+                    continue
+                current_iface: str = ""
+                for line in proc.stdout.splitlines():
+                    iface_m = re.match(r"^(\w[\w.:-]*)[\s:]", line)
+                    if iface_m and not line.startswith(" ") and not line.startswith("\t"):
+                        current_iface = iface_m.group(1)
+                    inet_m = re.search(
+                        r"inet (\d+\.\d+\.\d+\.\d+)[/ ]"
+                        r"(?:netmask )?(0x[\da-fA-F]+|\d+\.\d+\.\d+\.\d+|(\d+))?",
+                        line,
+                    )
+                    if not inet_m or not current_iface:
+                        continue
+                    ip = inet_m.group(1)
+                    if ip.startswith("127."):
+                        continue
+                    raw_mask = inet_m.group(2) or ""
+                    prefix_m = re.search(r"/(\d+)", line)
+                    try:
+                        if prefix_m:
+                            network = ipaddress.IPv4Network(f"{ip}/{prefix_m.group(1)}", strict=False)
+                        elif raw_mask.startswith("0x"):
+                            mask_bytes = int(raw_mask, 16).to_bytes(4, "big")
+                            mask_str = socket.inet_ntoa(mask_bytes)
+                            network = ipaddress.IPv4Network(f"{ip}/{mask_str}", strict=False)
+                        elif raw_mask:
+                            network = ipaddress.IPv4Network(f"{ip}/{raw_mask}", strict=False)
+                        else:
+                            continue
+                        networks.append({
+                            "interface": current_iface,
+                            "ip": ip,
+                            "network": str(network),
+                            "is_primary": ip == local_ip,
+                        })
+                    except Exception:
+                        continue
+                if networks:
+                    break
+            except Exception:
+                continue
+
+        primary = next((n["network"] for n in networks if n["is_primary"]), None)
+        return json.dumps({
+            "local_ip": local_ip,
+            "networks": networks,
+            "primary_network": primary,
+            "recommendation": (
+                f"Use '{primary}' as the target for ARP scan." if primary else
+                "Could not auto-detect network. Try common ranges like 192.168.1.0/24."
+            ),
+        })
+
+    @staticmethod
     def _arp_scan(target: str, interface: str | None, timeout: int) -> str:
         from scapy.all import ARP, Ether, conf, srp
 
@@ -180,14 +265,21 @@ class ScapyTool(BaseTool):
 
     @staticmethod
     def _port_scan(target: str, ports: str, timeout: int) -> str:
+        import time
         from scapy.all import IP, TCP, sr1
 
         port_list = _parse_ports(ports)
         results: List[Dict[str, Any]] = []
+        scan_start = time.monotonic()
+        truncated = False
 
         for port in port_list:
+            if time.monotonic() - scan_start >= timeout:
+                truncated = True
+                break
+
             pkt = IP(dst=target) / TCP(dport=port, flags="S")
-            resp = sr1(pkt, timeout=min(timeout, 3), verbose=False)
+            resp = sr1(pkt, timeout=min(timeout, 1), verbose=False)
 
             if resp is None:
                 status = "filtered"
@@ -211,7 +303,9 @@ class ScapyTool(BaseTool):
         open_ports = [r for r in results if r["status"] == "open"]
         return json.dumps({
             "target": target,
-            "ports_scanned": len(port_list),
+            "ports_scanned": len(results),
+            "ports_requested": len(port_list),
+            "truncated": truncated,
             "open_count": len(open_ports),
             "results": results,
         })

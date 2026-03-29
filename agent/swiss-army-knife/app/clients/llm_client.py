@@ -2,12 +2,16 @@ import asyncio
 import json
 import logging
 from abc import ABC, abstractmethod
+from typing import Type, TypeVar
 
 import httpx
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI
+from pydantic import BaseModel
 
 from app.config import config
+
+T = TypeVar("T", bound=BaseModel)
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +25,21 @@ class LLMClient(ABC):
         temperature: float = 0.3,
         json_mode: bool = False,
     ) -> str: ...
+
+    async def generate_structured(
+        self,
+        prompt: str,
+        response_model: Type[T],
+        system: str = "",
+        temperature: float = 0.3,
+    ) -> T:
+        """Generate structured output parsed into a Pydantic model.
+
+        Default implementation: call generate with json_mode and parse.
+        Subclasses can override for native structured output support.
+        """
+        raw = await self.generate(prompt, system=system, temperature=temperature, json_mode=True)
+        return response_model.model_validate_json(raw)
 
 
 class OllamaClient(LLMClient):
@@ -82,6 +101,27 @@ class OpenAIClient(LLMClient):
 
         response = await self.client.chat.completions.create(**kwargs)
         return response.choices[0].message.content or ""
+
+    async def generate_structured(
+        self,
+        prompt: str,
+        response_model: Type[T],
+        system: str = "",
+        temperature: float = 0.3,
+    ) -> T:
+        """Use OpenAI's native structured output (response_format with json_schema)."""
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        response = await self.client.beta.chat.completions.parse(
+            model=self.model,
+            messages=messages,
+            temperature=temperature,
+            response_format=response_model,
+        )
+        return response.choices[0].message.parsed
 
 
 class AnthropicClient(LLMClient):

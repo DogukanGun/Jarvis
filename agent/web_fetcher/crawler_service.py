@@ -1,12 +1,12 @@
-"""Crawler service for the web_fetcher API. Uses Crawlee PlaywrightCrawler with in-memory storage per request."""
+"""Crawler service for the web_fetcher API. Uses Playwright directly (no Crawlee)."""
 
 from __future__ import annotations
 
-import asyncio
+from collections import deque
 from typing import Any
+from urllib.parse import urljoin, urlparse
 
-from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
-from crawlee.storage_clients import MemoryStorageClient
+from playwright.async_api import async_playwright
 
 # Limits
 MAX_PAGES_GLOBAL_CAP = 500
@@ -21,27 +21,27 @@ def _truncate(s: str, max_chars: int) -> str:
     return s[:max_chars] + "... [truncated]"
 
 
+def _same_domain(base: str, link: str) -> bool:
+    try:
+        return urlparse(base).netloc == urlparse(link).netloc
+    except Exception:
+        return False
+
+
 async def fetch_page(url: str, *, max_chars: int = DEFAULT_MAX_CHARS_PER_PAGE) -> dict[str, Any]:
     """Fetch a single page and return url, title, and main text content."""
-    storage_client = MemoryStorageClient()
-    result: dict[str, Any] = {"url": url, "title": "", "content": ""}
-
-    crawler = PlaywrightCrawler(
-        storage_client=storage_client,
-        headless=True,
-        max_requests_per_crawl=1,
-        max_request_retries=2,
-    )
-
-    @crawler.router.default_handler
-    async def handler(context: PlaywrightCrawlingContext) -> None:
-        result["url"] = context.request.url
-        result["title"] = await context.page.title() or ""
-        raw = await context.page.evaluate("() => document.body?.innerText ?? ''")
-        result["content"] = _truncate(str(raw or ""), max_chars)
-
-    await crawler.run([url])
-    return result
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            final_url = page.url
+            title = await page.title() or ""
+            raw = await page.evaluate("() => document.body?.innerText ?? ''")
+            content = _truncate(str(raw or ""), max_chars)
+            return {"url": final_url, "title": title, "content": content}
+        finally:
+            await browser.close()
 
 
 async def list_site_pages(
@@ -52,23 +52,36 @@ async def list_site_pages(
 ) -> list[str]:
     """Discover all page URLs reachable from the seed URL. Returns list of URLs only."""
     max_pages = min(max_pages, MAX_PAGES_GLOBAL_CAP)
-    storage_client = MemoryStorageClient()
     visited: list[str] = []
+    seen: set[str] = set()
+    queue: deque[str] = deque([url])
+    seen.add(url)
 
-    crawler = PlaywrightCrawler(
-        storage_client=storage_client,
-        headless=True,
-        max_requests_per_crawl=max_pages,
-        max_request_retries=2,
-    )
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            while queue and len(visited) < max_pages:
+                current = queue.popleft()
+                try:
+                    page = await browser.new_page()
+                    await page.goto(current, wait_until="domcontentloaded", timeout=20000)
+                    visited.append(page.url)
+                    # Collect links
+                    hrefs = await page.eval_on_selector_all(
+                        "a[href]", "els => els.map(e => e.href)"
+                    )
+                    await page.close()
+                    for href in hrefs:
+                        resolved = urljoin(current, href).split("#")[0]
+                        if resolved not in seen:
+                            if not same_domain_only or _same_domain(url, resolved):
+                                seen.add(resolved)
+                                queue.append(resolved)
+                except Exception:
+                    pass
+        finally:
+            await browser.close()
 
-    @crawler.router.default_handler
-    async def handler(context: PlaywrightCrawlingContext) -> None:
-        visited.append(context.request.url)
-        strategy = "same-domain" if same_domain_only else "all"
-        await context.enqueue_links(strategy=strategy)
-
-    await crawler.run([url])
     return visited
 
 
@@ -81,26 +94,37 @@ async def fetch_site_contents(
 ) -> list[dict[str, Any]]:
     """Crawl the site from the seed URL and return url, title, content for each page."""
     max_pages = min(max_pages, MAX_PAGES_GLOBAL_CAP)
-    storage_client = MemoryStorageClient()
+    results: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    queue: deque[str] = deque([url])
+    seen.add(url)
 
-    crawler = PlaywrightCrawler(
-        storage_client=storage_client,
-        headless=True,
-        max_requests_per_crawl=max_pages,
-        max_request_retries=2,
-    )
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            while queue and len(results) < max_pages:
+                current = queue.popleft()
+                try:
+                    page = await browser.new_page()
+                    await page.goto(current, wait_until="domcontentloaded", timeout=20000)
+                    final_url = page.url
+                    title = await page.title() or ""
+                    raw = await page.evaluate("() => document.body?.innerText ?? ''")
+                    content = _truncate(str(raw or ""), max_chars_per_page)
+                    results.append({"url": final_url, "title": title, "content": content})
+                    hrefs = await page.eval_on_selector_all(
+                        "a[href]", "els => els.map(e => e.href)"
+                    )
+                    await page.close()
+                    for href in hrefs:
+                        resolved = urljoin(current, href).split("#")[0]
+                        if resolved not in seen:
+                            if not same_domain_only or _same_domain(url, resolved):
+                                seen.add(resolved)
+                                queue.append(resolved)
+                except Exception:
+                    pass
+        finally:
+            await browser.close()
 
-    @crawler.router.default_handler
-    async def handler(context: PlaywrightCrawlingContext) -> None:
-        title = await context.page.title() or ""
-        raw = await context.page.evaluate("() => document.body?.innerText ?? ''")
-        content = _truncate(str(raw or ""), max_chars_per_page)
-        await context.push_data(
-            {"url": context.request.url, "title": title, "content": content}
-        )
-        strategy = "same-domain" if same_domain_only else "all"
-        await context.enqueue_links(strategy=strategy)
-
-    await crawler.run([url])
-    data = await crawler.get_data()
-    return list(data.items)
+    return results

@@ -6,7 +6,7 @@ import ChatInput from '../components/ChatInput';
 import Sidebar from '../components/Sidebar';
 
 export default function Home() {
-  const { messages, loading, sendMessage } = useChat('default');
+  const { messages, loading, status, sendMessage } = useChat('default');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,10 +56,13 @@ export default function Home() {
             {loading && (
               <div className="flex justify-start animate-fade-in">
                 <div className="bg-slate-800 border border-slate-700/50 rounded-2xl rounded-bl-md px-4 py-3">
-                  <div className="flex gap-1.5">
-                    <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1.5">
+                      <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    {status && <span className="text-xs text-slate-500">{status}</span>}
                   </div>
                 </div>
               </div>

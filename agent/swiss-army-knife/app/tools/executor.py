@@ -84,6 +84,7 @@ class PythonExecutor:
         self,
         func: Callable,
         *args,
+        timeout: int = 180,
         **kwargs,
     ) -> ToolResult:
         """Run a synchronous callable on a background thread.
@@ -91,6 +92,7 @@ class PythonExecutor:
         Args:
             func: The callable to execute.
             *args: Positional arguments forwarded to *func*.
+            timeout: Maximum seconds to wait before returning a timeout error.
             **kwargs: Keyword arguments forwarded to *func*.
 
         Returns:
@@ -98,13 +100,25 @@ class PythonExecutor:
         """
         start = time.monotonic()
         try:
-            result = await asyncio.to_thread(func, *args, **kwargs)
+            result = await asyncio.wait_for(
+                asyncio.to_thread(func, *args, **kwargs),
+                timeout=timeout,
+            )
             duration_ms = int((time.monotonic() - start) * 1000)
             return ToolResult(
                 exit_code=0,
                 raw_output=str(result),
                 success=True,
                 error=None,
+                duration_ms=duration_ms,
+            )
+        except asyncio.TimeoutError:
+            duration_ms = int((time.monotonic() - start) * 1000)
+            return ToolResult(
+                exit_code=-1,
+                raw_output="",
+                success=False,
+                error=f"Tool timed out after {timeout}s",
                 duration_ms=duration_ms,
             )
         except Exception as exc:

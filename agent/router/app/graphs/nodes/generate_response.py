@@ -10,12 +10,12 @@ logger = logging.getLogger(__name__)
 
 RESPONSE_SYSTEM_PROMPT = """You are Jarvis, an intelligent AI assistant. You help users with research, web browsing, and general conversation.
 
-You have access to these capabilities:
-- Memory: You remember past conversations and user preferences
-- Thinker: A research pipeline that can produce academic papers on topics
-- Web Fetcher: Can fetch and read web page content
+CRITICAL RULES:
+- If "## Tool results:" contains "Fetched page:", the web page has ALREADY been fetched and its content is right there. Summarize or answer from it. NEVER say you cannot browse the web.
+- If tool results mention a research pipeline started, confirm it is running.
+- For general questions, give a direct helpful answer.
 
-Based on the context provided, generate a helpful and concise response."""
+Be concise and focused on what the user asked."""
 
 
 def generate_response(state: RouterGraphState) -> Dict[str, Any]:
@@ -89,6 +89,81 @@ def generate_response(state: RouterGraphState) -> Dict[str, Any]:
                         for f in sk_findings[:10]:
                             context_parts.append(f"  - {json.dumps(f, default=str)[:200]}")
 
+    # For web_fetch: summarize the fetched content with a focused LLM prompt
+    wf_result = tool_results.get("web_fetcher", {})
+    if intent == "web_fetch" and wf_result:
+        if wf_result.get("error"):
+            return {"response": f"Could not fetch the page: {wf_result['error']}"}
+        content = wf_result.get("content", "")
+        title = wf_result.get("title", "")
+        url = wf_result.get("url", "")
+        if content:
+            try:
+                client = httpx.Client(timeout=60.0)
+                summarize_prompt = (
+                    f"The user asked: {message}\n\n"
+                    f"Here is the content fetched from {url}:\n"
+                    f"Title: {title}\n\n"
+                    f"{content[:4000]}\n\n"
+                    f"Summarize the key information from this page that answers the user's question. "
+                    f"Be concise and clear."
+                )
+                if config.LLM_PROVIDER == "openai":
+                    resp = client.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {config.OPENAI_API_KEY}"},
+                        json={
+                            "model": config.LLM_MODEL,
+                            "messages": [{"role": "user", "content": summarize_prompt}],
+                            "temperature": 0.3,
+                        },
+                    )
+                    resp.raise_for_status()
+                    summary = resp.json()["choices"][0]["message"]["content"].strip()
+                else:
+                    resp = client.post(
+                        f"{config.OLLAMA_BASE_URL}/api/generate",
+                        json={"model": config.LLM_MODEL, "prompt": summarize_prompt, "stream": False},
+                    )
+                    resp.raise_for_status()
+                    summary = resp.json().get("response", "").strip()
+                client.close()
+                if summary:
+                    return {"response": summary}
+            except Exception as e:
+                logger.error(f"Web fetch summarization failed: {e}")
+                # Fall through to raw content
+            header = f"**{title}** ({url})\n\n" if title else f"**{url}**\n\n"
+            return {"response": header + content[:3000]}
+
+    # For security tool: pass through completed response or return async status
+    sk_result = tool_results.get("swiss_knife", {})
+    if intent == "security" and sk_result:
+        if sk_result.get("status") == "started":
+            job_id = sk_result.get("job_id", "")
+            monitor_url = sk_result.get("monitor_url", "http://localhost:3003")
+            return {
+                "response": (
+                    f"Security scan started! Your scan is now running in the background.\n\n"
+                    f"**Job ID:** `{job_id[:8]}...`\n\n"
+                    f"Track progress in real-time at the "
+                    f"[Swiss Army Knife Monitor]({monitor_url})\n\n"
+                    f"The scan will execute network tools, analyze results, "
+                    f"and generate a full security report."
+                )
+            }
+        if sk_result.get("response") and not sk_result.get("error"):
+            # Merge the sub-agent's detailed tool names into tools_used
+            sub_tools = sk_result.get("tools_used", [])
+            current_tools = state.get("tools_used", [])
+            merged_tools = current_tools + [t for t in sub_tools if t not in current_tools]
+            return {
+                "response": sk_result["response"],
+                "tools_used": merged_tools,
+                "findings": sk_result.get("findings", []),
+                "report": sk_result.get("report", {}),
+            }
+
     context_str = "\n".join(context_parts) if context_parts else ""
 
     # Build the full prompt
@@ -96,17 +171,33 @@ def generate_response(state: RouterGraphState) -> Dict[str, Any]:
 
     try:
         client = httpx.Client(timeout=60.0)
-        resp = client.post(
-            f"{config.OLLAMA_BASE_URL}/api/generate",
-            json={
-                "model": config.LLM_MODEL,
-                "prompt": prompt,
-                "stream": False,
-                "options": {"temperature": config.LLM_TEMPERATURE},
-            },
-        )
-        resp.raise_for_status()
-        response_text = resp.json().get("response", "").strip()
+        if config.LLM_PROVIDER == "openai":
+            resp = client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {config.OPENAI_API_KEY}"},
+                json={
+                    "model": config.LLM_MODEL,
+                    "messages": [
+                        {"role": "system", "content": RESPONSE_SYSTEM_PROMPT},
+                        {"role": "user", "content": f"{context_str}\n\nUser: {message}"},
+                    ],
+                    "temperature": config.LLM_TEMPERATURE,
+                },
+            )
+            resp.raise_for_status()
+            response_text = resp.json()["choices"][0]["message"]["content"].strip()
+        else:
+            resp = client.post(
+                f"{config.OLLAMA_BASE_URL}/api/generate",
+                json={
+                    "model": config.LLM_MODEL,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"temperature": config.LLM_TEMPERATURE},
+                },
+            )
+            resp.raise_for_status()
+            response_text = resp.json().get("response", "").strip()
         client.close()
 
         if not response_text:

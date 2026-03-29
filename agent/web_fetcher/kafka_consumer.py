@@ -62,7 +62,6 @@ class WebFetcherKafkaConsumer:
             group_id=f"{agent_id}-group",
             auto_offset_reset="latest",
             value_deserializer=lambda m: json.loads(m.decode("utf-8")),
-            consumer_timeout_ms=1000,
         )
 
         # Initialize Kafka producer for publishing events

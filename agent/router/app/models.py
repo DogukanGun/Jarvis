@@ -14,6 +14,8 @@ class ChatResponse(BaseModel):
     response: str
     intent: str = "chat"
     tools_used: List[str] = Field(default_factory=list)
+    findings: List[Dict[str, Any]] = Field(default_factory=list)
+    report: Dict[str, Any] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
