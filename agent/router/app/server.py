@@ -18,7 +18,7 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Set
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import config
@@ -135,6 +135,7 @@ async def chat(req: ChatRequest):
     5. Writes to memory
     """
     from app.graphs.router_graph import run_router
+    from app.graphs.nodes import analyze_emotion
 
     history = _conversations.get(req.user_id, [])
 
@@ -145,6 +146,10 @@ async def chat(req: ChatRequest):
         conversation_history=history,
     )
     duration_ms = round((time.time() - t0) * 1000)
+
+    # Run emotion analysis on the message (first iteration: after graph completes)
+    emotion_result = analyze_emotion({"user_id": req.user_id, "message": req.message})
+    emotion = emotion_result.get("emotion_analysis", {})
 
     response_text = result.get("response", "Sorry, I couldn't process that.")
     intent = result.get("intent", "chat")
@@ -165,6 +170,7 @@ async def chat(req: ChatRequest):
         metadata={
             "duration_ms": duration_ms,
             "user_id": req.user_id,
+            "emotion": emotion,
         },
     )
 
@@ -192,6 +198,10 @@ async def ws_chat(ws: WebSocket):
             data = json.loads(raw)
             user_id = data.get("user_id", "default")
             message = data.get("message", "")
+            visual_frame = data.get("visual_frame")
+            visual_feed = None
+            if visual_frame:
+                visual_feed = {"source": "desktop", "way": "yolo", "data": {"frame_b64": visual_frame}}
 
             if not message:
                 await ws.send_json({"type": "error", "content": "Empty message"})
@@ -215,14 +225,18 @@ async def ws_chat(ws: WebSocket):
                 "conversation_history": history,
                 "tools_used": [],
                 "tool_results": {},
+                "visual_feed": visual_feed,
             }
 
-            # Phase 1: classify intent (fast)
-            from app.graphs.nodes import retrieve_memory, classify_intent as _classify
+            # Phase 1: classify intent + emotion (fast)
+            from app.graphs.nodes import retrieve_memory, classify_intent as _classify, analyze_emotion, process_visual
 
             def _classify_phase(s):
                 with_memory = {**s, **retrieve_memory(s)}
-                return {**with_memory, **_classify(with_memory)}
+                classified = {**with_memory, **_classify(with_memory)}
+                emotion = analyze_emotion(with_memory)
+                visual = process_visual(with_memory)
+                return {**classified, **emotion, **visual}
 
             phase1 = await asyncio.to_thread(_classify_phase, initial_state)
             intent_detected = phase1.get("intent", "chat")
@@ -264,6 +278,8 @@ async def ws_chat(ws: WebSocket):
                 "tools_used": tools_used,
                 "findings": findings,
                 "report": report,
+                "emotion": result.get("emotion_analysis", {}),
+                "visual_context": result.get("visual_context", {}),
                 "duration_ms": duration_ms,
             })
 
@@ -279,6 +295,36 @@ async def ws_chat(ws: WebSocket):
         async with _ws_lock:
             _ws_clients.discard(ws)
         logger.info("WebSocket client removed (%d remaining)", len(_ws_clients))
+
+
+# ---------------------------------------------------------------------------
+# Speech-to-text endpoint
+# ---------------------------------------------------------------------------
+
+@app.post("/api/transcribe")
+async def transcribe(file: UploadFile):
+    """Transcribe audio to text using OpenAI Whisper."""
+    import httpx
+
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        return {"text": "", "error": "Empty audio"}
+
+    try:
+        client = httpx.Client(timeout=30.0)
+        resp = client.post(
+            "https://api.openai.com/v1/audio/transcriptions",
+            headers={"Authorization": f"Bearer {config.OPENAI_API_KEY}"},
+            files={"file": (file.filename or "audio.webm", audio_bytes, file.content_type or "audio/webm")},
+            data={"model": "whisper-1"},
+        )
+        resp.raise_for_status()
+        client.close()
+        text = resp.json().get("text", "").strip()
+        return {"text": text}
+    except Exception as e:
+        logger.error(f"Transcription failed: {e}")
+        return {"text": "", "error": str(e)}
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +350,7 @@ async def agents_status():
     from app.clients.web_fetcher_client import WebFetcherClient
     from app.clients.memory_client import MemoryClient
     from app.clients.swiss_knife_client import SwissKnifeClient
+    from app.clients.vision_client import VisionClient
 
     agents = []
 
@@ -322,5 +369,9 @@ async def agents_status():
     sk = SwissKnifeClient()
     agents.append(AgentStatus(name="swiss_army_knife", url=config.SWISS_KNIFE_BASE_URL, healthy=sk.health_check()))
     sk.close()
+
+    vc = VisionClient()
+    agents.append(AgentStatus(name="vision", url=config.VISION_BASE_URL, healthy=vc.health_check()))
+    vc.close()
 
     return {"agents": [a.model_dump() for a in agents]}

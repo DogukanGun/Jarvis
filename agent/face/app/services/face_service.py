@@ -1,51 +1,53 @@
 """Face recognition logic — encoding, enrollment, and admin checks."""
 
-import base64
-import io
 import logging
-
-import face_recognition
 import numpy as np
-from PIL import Image
-
-from app.config import ADMIN_FILE
+from app.config import ADMIN_FILE, ANTI_SPOOF_MODEL_DIR, ANTI_SPOOF_THRESHOLD
+from app.helper import FaceEngine, AntiSpoofEngine
 
 logger = logging.getLogger(__name__)
 
-
-def admin_exists() -> bool:
-    return ADMIN_FILE.exists()
-
-
-def enroll_admin(image_b64: str) -> dict:
-    """
-    Decode a base64 image, extract the first face encoding, and save it as the admin.
-    Returns {"success": True} or {"error": "<reason>"}.
-    """
-    try:
-        img_bytes = base64.b64decode(image_b64)
-    except Exception as e:
-        return {"error": f"Invalid base64 data: {e}"}
-
-    try:
-        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-        arr = np.array(img)
-    except Exception as e:
-        return {"error": f"Could not decode image: {e}"}
-
-    encodings = face_recognition.face_encodings(arr)
-    if not encodings:
-        return {"error": "No face detected in the image"}
-
-    ADMIN_FILE.parent.mkdir(parents=True, exist_ok=True)
-    np.save(str(ADMIN_FILE), encodings[0])
-    logger.info("Admin face enrolled and saved to %s", ADMIN_FILE)
-    return {"success": True}
+engine = FaceEngine()
+anti_spoof = AntiSpoofEngine(ANTI_SPOOF_MODEL_DIR)
+threshold = 0.8
 
 
-def delete_admin() -> dict:
-    """Remove the saved admin face (dev utility)."""
-    if ADMIN_FILE.exists():
-        ADMIN_FILE.unlink()
-        logger.info("Admin face deleted")
-    return {"success": True}
+def _check_liveness(image, bbox):
+    """Run anti-spoofing check; raises ValueError if face is not live."""
+    is_live, confidence = anti_spoof.check_liveness(image, bbox, ANTI_SPOOF_THRESHOLD)
+    logger.info(f"Liveness check: is_live={is_live}, confidence={confidence:.4f}, threshold={ANTI_SPOOF_THRESHOLD}")
+    if not is_live:
+        raise ValueError(
+            f"Liveness check failed (confidence: {confidence:.2f}). "
+            "Please use a real face, not a photo or screen."
+        )
+
+
+class FaceRecognitionService:
+
+    @staticmethod
+    def admin_exists() -> bool:
+        return ADMIN_FILE.exists()
+
+    @staticmethod
+    def is_admin(image_bytes: bytes) -> bool:
+        face_data = engine.get_face_data(image_bytes)
+        _check_liveness(face_data["image"], face_data["bbox"])
+        saved_embedding = np.load(ADMIN_FILE)
+        similarity = engine.cosine_similarity(saved_embedding, face_data["embedding"])
+        return similarity >= threshold
+
+    @staticmethod
+    def enroll_admin(image_bytes: bytes) -> bool:
+        face_data = engine.get_face_data(image_bytes)
+        _check_liveness(face_data["image"], face_data["bbox"])
+        np.save(ADMIN_FILE, face_data["embedding"])
+        return True
+
+    @staticmethod
+    def delete_admin() -> bool:
+        """Remove the saved admin face (dev utility)."""
+        if ADMIN_FILE.exists():
+            ADMIN_FILE.unlink()
+            logger.info("Admin face deleted")
+        return True

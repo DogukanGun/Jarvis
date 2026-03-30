@@ -24,6 +24,7 @@ class RouterConfig:
     WEB_FETCHER_BASE_URL = os.getenv("WEB_FETCHER_BASE_URL", "http://localhost:8000")
     MEMORY_BASE_URL = os.getenv("MEMORY_BASE_URL", "http://localhost:8686")
     SWISS_KNIFE_BASE_URL = os.getenv("SWISS_KNIFE_BASE_URL", "http://localhost:8789")
+    VISION_BASE_URL = os.getenv("VISION_BASE_URL", "http://localhost:8500")
 
 
 config = RouterConfig()

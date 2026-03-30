@@ -45,12 +45,13 @@ app.whenReady().then(async () => {
     }
   })
 
-  // On macOS ask the OS for camera access (shows system dialog once)
+  // On macOS ask the OS for camera + microphone access (shows system dialog once)
   if (process.platform === 'darwin') {
-    const status = await systemPreferences.askForMediaAccess('camera')
-    if (!status) {
-      console.warn('Camera access denied by macOS')
-    }
+    const camStatus = await systemPreferences.askForMediaAccess('camera')
+    if (!camStatus) console.warn('Camera access denied by macOS')
+
+    const micStatus = await systemPreferences.askForMediaAccess('microphone')
+    if (!micStatus) console.warn('Microphone access denied by macOS')
   }
 
   app.on('browser-window-created', (_, window) => {

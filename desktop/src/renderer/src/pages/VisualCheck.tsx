@@ -1,13 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { adminExists, enrollAdmin } from '../lib/faceApi'
+import { adminExists, enrollAdmin, verifyAdmin } from '../lib/faceApi'
 import { useCamera } from '../hooks/useCamera'
 
-type State = 'checking' | 'no_admin' | 'enrolling' | 'enrolled' | 'admin_exists' | 'error'
+type State =
+  | 'checking'
+  | 'no_admin'
+  | 'enrolling'
+  | 'enrolled'
+  | 'verifying'
+  | 'verified'
+  | 'denied'
+  | 'error'
 
-export default function VisualCheck(): React.JSX.Element {
+export default function VisualCheck({ onVerified }: { onVerified?: () => void }): React.JSX.Element {
   const [state, setState] = useState<State>('checking')
   const [statusMsg, setStatusMsg] = useState('Initializing…')
-  const enrollLoopRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const loopRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { videoRef, ready, error: camError, capture, stop } = useCamera()
 
@@ -16,8 +24,8 @@ export default function VisualCheck(): React.JSX.Element {
     adminExists()
       .then((exists) => {
         if (exists) {
-          setState('admin_exists')
-          setStatusMsg('Admin on file — identity verification coming soon.')
+          setState('verifying')
+          setStatusMsg('Please look at the camera to verify your identity.')
         } else {
           setState('no_admin')
           setStatusMsg('No admin registered. Please look at the camera.')
@@ -29,7 +37,7 @@ export default function VisualCheck(): React.JSX.Element {
       })
   }, [])
 
-  // Step 2: once camera is ready and state is no_admin, start auto-enroll loop
+  // Step 2: enroll loop when no admin
   useEffect(() => {
     if (state !== 'no_admin' || !ready) return
 
@@ -42,8 +50,7 @@ export default function VisualCheck(): React.JSX.Element {
 
       const img = capture()
       if (!img) {
-        // camera not ready yet, retry
-        enrollLoopRef.current = setTimeout(tryEnroll, 1500)
+        loopRef.current = setTimeout(tryEnroll, 1500)
         return
       }
 
@@ -52,44 +59,101 @@ export default function VisualCheck(): React.JSX.Element {
       if (cancelled) return
 
       if ('success' in result && result.success) {
-        stop()
         setState('enrolled')
-        setStatusMsg('Admin registered! Welcome.')
+        setStatusMsg('Admin registered! Verifying…')
+        // transition to verification after a brief pause
+        loopRef.current = setTimeout(() => {
+          if (!cancelled) setState('verifying')
+        }, 1500)
       } else {
-        // no face detected — retry silently
-        enrollLoopRef.current = setTimeout(tryEnroll, 1500)
+        loopRef.current = setTimeout(tryEnroll, 1500)
       }
     }
 
-    // small delay to let the camera stabilize before first capture
-    enrollLoopRef.current = setTimeout(tryEnroll, 1000)
+    loopRef.current = setTimeout(tryEnroll, 1000)
 
     return () => {
       cancelled = true
-      if (enrollLoopRef.current) clearTimeout(enrollLoopRef.current)
+      if (loopRef.current) clearTimeout(loopRef.current)
     }
   }, [state, ready])
 
-  const showCamera = state === 'no_admin' || state === 'enrolling'
+  // Step 3: verification loop
+  useEffect(() => {
+    if (state !== 'verifying' || !ready) return
+
+    let cancelled = false
+
+    async function tryVerify(): Promise<void> {
+      if (cancelled) return
+      setStatusMsg('Verifying your identity…')
+
+      const img = capture()
+      if (!img) {
+        loopRef.current = setTimeout(tryVerify, 1500)
+        return
+      }
+
+      const result = await verifyAdmin(img).catch(() => ({ error: 'network error' }))
+
+      if (cancelled) return
+
+      if (result.success && result.data === true) {
+        stop()
+        setState('verified')
+        setStatusMsg('Identity verified. Welcome back!')
+      } else if (result.success && result.data === false) {
+        stop()
+        setState('denied')
+        setStatusMsg('Face not recognised.')
+      } else {
+        // face not detected or liveness failed — retry silently
+        loopRef.current = setTimeout(tryVerify, 1500)
+      }
+    }
+
+    loopRef.current = setTimeout(tryVerify, 1000)
+
+    return () => {
+      cancelled = true
+      if (loopRef.current) clearTimeout(loopRef.current)
+    }
+  }, [state, ready])
+
+  useEffect(() => {
+    if (state === 'verified' && onVerified) {
+      const timer = setTimeout(onVerified, 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [state, onVerified])
+
+  const showCamera = ['no_admin', 'enrolling', 'verifying'].includes(state)
 
   return (
     <div className="visual-check">
       {/* Status message */}
-      <p className={`status-text ${state === 'enrolled' ? 'success' : state === 'error' ? 'error' : ''}`}>
+      <p
+        className={`status-text ${
+          state === 'verified' || state === 'enrolled'
+            ? 'success'
+            : state === 'error' || state === 'denied'
+              ? 'error'
+              : ''
+        }`}
+      >
         {camError ?? statusMsg}
       </p>
 
-      {/* Camera feed — visible while enrolling */}
+      {/* Camera feed */}
       <div className={`camera-container ${showCamera ? 'visible' : 'hidden'}`}>
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video ref={videoRef} autoPlay playsInline muted className="camera-feed" />
-        {state === 'enrolling' && <div className="scan-overlay" />}
+        {(state === 'enrolling' || state === 'verifying') && <div className="scan-overlay" />}
       </div>
 
-      {/* Enrolled checkmark */}
-      {state === 'enrolled' && (
-        <div className="enrolled-icon">✓</div>
-      )}
+      {/* Result icons */}
+      {state === 'verified' && <div className="enrolled-icon">✓</div>}
+      {state === 'denied' && <div className="enrolled-icon error">✗</div>}
     </div>
   )
 }

@@ -15,7 +15,20 @@ CRITICAL RULES:
 - If tool results mention a research pipeline started, confirm it is running.
 - For general questions, give a direct helpful answer.
 
-Be concise and focused on what the user asked."""
+Be concise and focused on what the user asked.
+
+EMOTIONAL AWARENESS:
+- If emotion context is provided, subtly adapt your tone to match the user's emotional state.
+- For negative emotions (sad, angry, frustrated, anxious), be empathetic and supportive.
+- For positive emotions (happy, excited, grateful), mirror the energy warmly.
+- For curious users, be thorough and engaging.
+- For confused users, be extra clear and structured.
+- Never explicitly mention that you detected their emotion.
+
+VISUAL AWARENESS:
+- If visual context is provided, you can see what the user sees through their camera.
+- Reference detected objects naturally when relevant to the conversation.
+- Do not list objects unprompted unless the user asks what you see."""
 
 
 def generate_response(state: RouterGraphState) -> Dict[str, Any]:
@@ -88,6 +101,24 @@ def generate_response(state: RouterGraphState) -> Dict[str, Any]:
                         context_parts.append("Findings:")
                         for f in sk_findings[:10]:
                             context_parts.append(f"  - {json.dumps(f, default=str)[:200]}")
+
+    # Add emotion context if confidence is meaningful
+    emotion_analysis = state.get("emotion_analysis", {})
+    if emotion_analysis.get("confidence", 0.0) > 0.3:
+        emotion = emotion_analysis.get("emotion", "neutral")
+        valence = emotion_analysis.get("valence", 0.0)
+        arousal = emotion_analysis.get("arousal", 0.3)
+        context_parts.append(
+            f"\n## Emotion context:\n"
+            f"Detected emotion: {emotion} (valence={valence:.1f}, arousal={arousal:.1f})"
+        )
+
+    visual_context = state.get("visual_context")
+    if visual_context and visual_context.get("summary"):
+        context_parts.append(
+            f"\n## Visual context (camera):\n"
+            f"Objects detected: {visual_context['summary']}"
+        )
 
     # For web_fetch: summarize the fetched content with a focused LLM prompt
     wf_result = tool_results.get("web_fetcher", {})

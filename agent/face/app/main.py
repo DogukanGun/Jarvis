@@ -4,9 +4,8 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
-from app.services.face_service import admin_exists, delete_admin, enroll_admin
+from app.router import face_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,25 +21,15 @@ app.add_middleware(
 )
 
 
-class EnrollRequest(BaseModel):
-    image: str  # base64-encoded JPEG or PNG
-
 
 @app.get("/health")
 def health():
     return {"status": "healthy", "service": "face-api"}
 
-
-@app.get("/api/admin/exists")
-def get_admin_exists():
-    return {"exists": admin_exists()}
+app.include_router(face_router, prefix="/api")
 
 
-@app.post("/api/admin/enroll")
-def post_enroll_admin(body: EnrollRequest):
-    return enroll_admin(body.image)
-
-
-@app.delete("/api/admin")
-def delete_admin_route():
-    return delete_admin()
+if __name__ == "__main__":
+    import uvicorn
+    from app.config import PORT
+    uvicorn.run(app, host="0.0.0.0", port=PORT)

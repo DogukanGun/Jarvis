@@ -14,3 +14,14 @@ export async function enrollAdmin(imageBase64: string): Promise<{ success?: bool
   })
   return res.json()
 }
+
+export async function verifyAdmin(
+  imageBase64: string,
+): Promise<{ success?: boolean; data?: boolean; error?: string }> {
+  const res = await fetch(`${BASE}/api/admin/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: imageBase64 }),
+  })
+  return res.json()
+}

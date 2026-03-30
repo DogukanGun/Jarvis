@@ -26,6 +26,13 @@ class RouterGraphState(TypedDict, total=False):
     findings: List[Dict[str, Any]]
     report: Dict[str, Any]
 
+    # Emotion
+    emotion_analysis: Optional[Dict[str, Any]]
+
+    # Vision
+    visual_feed: Optional[Dict[str, Any]]
+    visual_context: Optional[Dict[str, Any]]
+
     # Output
     response: str
     error: Optional[str]

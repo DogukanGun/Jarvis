@@ -5,7 +5,7 @@
     <!-- CSP: allow connects to local Face API + camera/blob URLs -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' http://localhost:8400"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' http://localhost:* ws://localhost:* https://*.google.com https://*.googleapis.com"
     />
     <title>Jarvis</title>
   </head>
