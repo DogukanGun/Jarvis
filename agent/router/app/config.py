@@ -26,5 +26,15 @@ class RouterConfig:
     SWISS_KNIFE_BASE_URL = os.getenv("SWISS_KNIFE_BASE_URL", "http://localhost:8789")
     VISION_BASE_URL = os.getenv("VISION_BASE_URL", "http://localhost:8500")
 
+    # Security notification channels
+    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
+    SMTP_HOST = os.getenv("SMTP_HOST", "")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER = os.getenv("SMTP_USER", "")
+    SMTP_PASS = os.getenv("SMTP_PASS", "")
+    ALERT_EMAIL_TO = os.getenv("ALERT_EMAIL_TO", "")
+
 
 config = RouterConfig()

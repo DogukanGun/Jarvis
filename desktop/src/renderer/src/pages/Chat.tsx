@@ -12,7 +12,13 @@ type Message = {
   timestamp: number
 }
 
-export default function Chat({ userId = 'admin' }: { userId?: string }): React.JSX.Element {
+export default function Chat({
+  userId = 'admin',
+  onGuardMode,
+}: {
+  userId?: string
+  onGuardMode?: () => void
+}): React.JSX.Element {
   const [messages, setMessages] = useState<Message[]>([])
   const [waiting, setWaiting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -161,11 +167,18 @@ export default function Chat({ userId = 'admin' }: { userId?: string }): React.J
   return (
     <div className="chat-page">
       <div className={`chat-status-bar ${status === 'connected' ? 'connected' : ''}`}>
-        {status === 'connected'
-          ? 'jarvis'
-          : status === 'disconnected'
-            ? 'disconnected — waiting for router on :8888'
-            : 'connecting...'}
+        <span>
+          {status === 'connected'
+            ? 'jarvis'
+            : status === 'disconnected'
+              ? 'disconnected — waiting for router on :8888'
+              : 'connecting...'}
+        </span>
+        {onGuardMode && (
+          <button className="guard-mode-btn" onClick={onGuardMode}>
+            Guard Mode
+          </button>
+        )}
       </div>
 
       <div className="chat-messages">

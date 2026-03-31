@@ -68,6 +68,16 @@ async def lifespan(app: FastAPI):
     """FastAPI lifespan: start Kafka consumer on startup, stop on shutdown."""
     global _kafka_thread, _kafka_consumer
 
+    # Register security notification channels
+    from app.security.event_bus import event_bus
+    from app.security.channels.websocket import WebSocketChannel
+    from app.security.channels.telegram import TelegramChannel
+    from app.security.channels.email import EmailChannel
+
+    event_bus.register(WebSocketChannel(_ws_clients))
+    event_bus.register(TelegramChannel(config))
+    event_bus.register(EmailChannel(config))
+
     if config.ENABLE_KAFKA_CONSUMER:
         loop = asyncio.get_event_loop()
         try:
@@ -207,6 +217,14 @@ async def ws_chat(ws: WebSocket):
                 await ws.send_json({"type": "error", "content": "Empty message"})
                 continue
 
+            # Guard mode alarm trigger — short-circuit before the LLM graph
+            if message.strip() == "/trigger":
+                from app.security.event_bus import event_bus, SecurityEvent
+                event = SecurityEvent(type="alarm_triggered", message="Manual alarm triggered by user")
+                await event_bus.broadcast(event)
+                await ws.send_json({"type": "response", "content": "Alarm triggered."})
+                continue
+
             history = _conversations.get(user_id, [])
 
             await ws.send_json({"type": "status", "content": "Classifying intent..."})
@@ -295,6 +313,36 @@ async def ws_chat(ws: WebSocket):
         async with _ws_lock:
             _ws_clients.discard(ws)
         logger.info("WebSocket client removed (%d remaining)", len(_ws_clients))
+
+
+# ---------------------------------------------------------------------------
+# Security alert endpoint
+# ---------------------------------------------------------------------------
+
+from pydantic import BaseModel
+
+
+class SecurityAlertRequest(BaseModel):
+    image_b64: str
+    message: str = "Intruder detected!"
+
+
+@app.post("/api/security/alert")
+async def security_alert(req: SecurityAlertRequest):
+    """Receive a security alert from the desktop guard mode.
+
+    Broadcasts a SecurityEvent to all registered channels (WebSocket, Telegram,
+    email, etc.) concurrently. Channels that are not configured are silently skipped.
+    """
+    from app.security.event_bus import event_bus, SecurityEvent
+
+    event = SecurityEvent(
+        type="intruder_detected",
+        message=req.message,
+        image_b64=req.image_b64,
+    )
+    await event_bus.broadcast(event)
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------

@@ -124,6 +124,9 @@ body,
   color: #666;
   border-bottom: 1px solid #1a1a1a;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .chat-status-bar.connected {
@@ -275,4 +278,141 @@ body,
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* ── Guard Mode ── */
+
+.guard-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #0a0a0a;
+  position: relative;
+}
+
+.guard-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid #1a1a1a;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.guard-status-indicator {
+  letter-spacing: 0.05em;
+}
+
+.guard-status-indicator.watching {
+  color: #4ade80;
+}
+
+.guard-status-indicator.verifying {
+  color: #facc15;
+}
+
+.guard-status-indicator.verified {
+  color: #4ade80;
+}
+
+.guard-status-indicator.alert {
+  color: #f87171;
+  animation: blink 0.5s step-end infinite;
+}
+
+.guard-mode-btn,
+.guard-deactivate-btn {
+  background: transparent;
+  border: 1px solid #2a2a2a;
+  color: #666;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.guard-mode-btn:hover,
+.guard-deactivate-btn:hover {
+  border-color: #4ade80;
+  color: #4ade80;
+}
+
+.guard-camera-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #111;
+}
+
+.guard-camera-container .camera-feed {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.alarm-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(248, 113, 113, 0.25);
+  animation: alarm-flash 0.25s step-end infinite;
+  pointer-events: none;
+}
+
+@keyframes alarm-flash {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.guard-alert-panel {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #120808;
+  border: 1px solid #f87171;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  z-index: 10;
+  min-width: 220px;
+}
+
+.guard-alert-title {
+  color: #f87171;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+.guard-intruder-photo {
+  width: 200px;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #f87171;
+}
+
+.guard-reset-btn {
+  background: transparent;
+  border: 1px solid #f87171;
+  color: #f87171;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.guard-reset-btn:hover {
+  background: rgba(248, 113, 113, 0.1);
 }

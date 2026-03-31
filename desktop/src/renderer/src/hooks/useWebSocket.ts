@@ -13,6 +13,7 @@ export interface UseWebSocketOptions {
   onStatus?: (text: string) => void
   onResponse?: (data: WsResponse) => void
   onError?: (text: string) => void
+  onAlarm?: () => void
 }
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
@@ -22,18 +23,19 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     url = 'ws://localhost:8888/ws/chat',
     onStatus,
     onResponse,
-    onError
+    onError,
+    onAlarm,
   } = options
 
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const callbacksRef = useRef({ onStatus, onResponse, onError })
+  const callbacksRef = useRef({ onStatus, onResponse, onError, onAlarm })
   const mountedRef = useRef(true)
 
   useEffect(() => {
-    callbacksRef.current = { onStatus, onResponse, onError }
-  }, [onStatus, onResponse, onError])
+    callbacksRef.current = { onStatus, onResponse, onError, onAlarm }
+  }, [onStatus, onResponse, onError, onAlarm])
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return
@@ -49,7 +51,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
-          const { onStatus, onResponse, onError } = callbacksRef.current
+          const { onStatus, onResponse, onError, onAlarm } = callbacksRef.current
           switch (data.type) {
             case 'status':
               onStatus?.(data.content ?? data.message ?? '')
@@ -59,6 +61,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
               break
             case 'error':
               onError?.(data.content ?? data.message ?? 'Unknown error')
+              break
+            case 'alarm':
+              onAlarm?.()
               break
             case 'agent_event': {
               // Kafka-forwarded async results from sub-agents
