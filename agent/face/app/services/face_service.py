@@ -35,6 +35,7 @@ class FaceRecognitionService:
         _check_liveness(face_data["image"], face_data["bbox"])
         saved_embedding = np.load(ADMIN_FILE)
         similarity = engine.cosine_similarity(saved_embedding, face_data["embedding"])
+        logger.info(f"Face similarity: {similarity:.4f} (threshold: {threshold})")
         return similarity >= threshold
 
     @staticmethod

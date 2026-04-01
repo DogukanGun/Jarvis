@@ -60,6 +60,108 @@ app.whenReady().then(async () => {
 
   ipcMain.on('ping', () => console.log('pong'))
 
+  ipcMain.on('minimize-window', () => {
+    const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+    if (win) win.minimize()
+  })
+
+  ipcMain.on('restore-window', () => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win) {
+      win.restore()
+      win.show()
+      win.focus()
+    }
+  })
+
+  // Guard mode — fullscreen overlay to block input
+  let guardOverlay: BrowserWindow | null = null
+
+  ipcMain.on('guard-activate', () => {
+    const mainWin = BrowserWindow.getAllWindows().find((w) => w !== guardOverlay)
+
+    // Create overlay on each screen
+    if (!guardOverlay) {
+      const { screen } = require('electron')
+      const primaryDisplay = screen.getPrimaryDisplay()
+      const { width, height } = primaryDisplay.size
+
+      guardOverlay = new BrowserWindow({
+        width,
+        height,
+        x: 0,
+        y: 0,
+        fullscreen: true,
+        transparent: true,
+        frame: false,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        focusable: true,
+        hasShadow: false,
+        resizable: false,
+        webPreferences: { nodeIntegration: false },
+      })
+      guardOverlay.loadURL('data:text/html,<html><body style="margin:0;cursor:none;background:transparent;"></body></html>')
+      guardOverlay.setIgnoreMouseEvents(false)
+      guardOverlay.setAlwaysOnTop(true, 'screen-saver')
+
+      // Listen for unlock combo on the overlay: Shift Shift Enter Enter
+      const combo = ['Shift', 'Shift', 'Enter', 'Enter']
+      let seq: string[] = []
+      let comboTimer: ReturnType<typeof setTimeout> | null = null
+
+      guardOverlay.webContents.on('before-input-event', (_event, input) => {
+        if (input.type !== 'keyDown') return
+        seq.push(input.key)
+        if (comboTimer) clearTimeout(comboTimer)
+        comboTimer = setTimeout(() => { seq = [] }, 2000)
+
+        if (seq.length >= combo.length) {
+          const tail = seq.slice(-combo.length)
+          if (tail.every((k, i) => k === combo[i])) {
+            seq = []
+            // Notify renderer that combo was entered
+            const mainWin = BrowserWindow.getAllWindows().find((w) => w !== guardOverlay)
+            if (mainWin) {
+              mainWin.webContents.send('guard-combo-matched')
+              mainWin.restore()
+              mainWin.show()
+              mainWin.setAlwaysOnTop(true, 'screen-saver')
+              mainWin.focus()
+            }
+          }
+        }
+      })
+    }
+
+    // Minimize main window behind overlay
+    if (mainWin) mainWin.minimize()
+  })
+
+  ipcMain.on('guard-show-pin', () => {
+    const mainWin = BrowserWindow.getAllWindows().find((w) => w !== guardOverlay)
+    if (mainWin) {
+      mainWin.restore()
+      mainWin.show()
+      mainWin.setAlwaysOnTop(true, 'screen-saver')
+      mainWin.focus()
+    }
+  })
+
+  ipcMain.on('guard-deactivate', () => {
+    if (guardOverlay) {
+      guardOverlay.destroy()
+      guardOverlay = null
+    }
+    const mainWin = BrowserWindow.getAllWindows()[0]
+    if (mainWin) {
+      mainWin.setAlwaysOnTop(false)
+      mainWin.restore()
+      mainWin.show()
+      mainWin.focus()
+    }
+  })
+
   createWindow()
 
   app.on('activate', () => {

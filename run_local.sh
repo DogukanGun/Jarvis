@@ -106,6 +106,7 @@ export SWISS_KNIFE_BASE_URL="http://localhost:8787"
 export THINKER_BASE_URL="http://localhost:8585"
 export MEMORY_BASE_URL="http://localhost:8686"
 export WEB_FETCHER_BASE_URL="http://localhost:8099"
+export VISION_BASE_URL="http://localhost:8500"
 export NEXT_PUBLIC_ROUTER_URL="http://localhost:8888"
 
 # =============================================================================
@@ -207,7 +208,17 @@ info "Starting face-api..."
     > "$LOG_DIR/face-api.log" 2>&1 &
 PIDS+=($!)
 
-# 7. Swiss Army Knife — needs sudo so scapy can open raw sockets
+# 7. Vision Service
+DIR="$ROOT/agent/vision"
+setup_venv "$DIR" "$DIR/requirements.txt"
+info "Starting vision..."
+( cd "$DIR" && AGENT_ID=vision PORT=8500 \
+    "$DIR/.venv/bin/python" -m uvicorn app.server:app \
+    --host 0.0.0.0 --port 8500 ) \
+    > "$LOG_DIR/vision.log" 2>&1 &
+PIDS+=($!)
+
+# 8. Swiss Army Knife — needs sudo so scapy can open raw sockets
 DIR="$ROOT/agent/swiss-army-knife"
 setup_venv "$DIR" "$DIR/requirements.txt"
 info "Starting swiss-army-knife ${YELLOW}(sudo required for scapy)${NC}..."
@@ -241,6 +252,7 @@ wait_for_port "thinker"          8585
 wait_for_port "router"           8888
 wait_for_port "swiss-army-knife" 8787
 wait_for_port "face-api"         8400
+wait_for_port "vision"           8500
 
 # =============================================================================
 #  NODE.JS UIs
@@ -296,6 +308,7 @@ echo -e "  ${BOLD}Desktop App${NC}          ${CYAN}(Electron window)${NC}"
 echo -e "  ${BOLD}Chat UI${NC}              ${CYAN}http://localhost:3002${NC}"
 echo -e "  ${BOLD}Router API${NC}           ${CYAN}http://localhost:8888${NC}"
 echo -e "  ${BOLD}Face API${NC}             ${CYAN}http://localhost:8400${NC}"
+echo -e "  ${BOLD}Vision${NC}               ${CYAN}http://localhost:8500${NC}"
 echo -e "  ${BOLD}Swiss-knife${NC}          ${CYAN}http://localhost:8787${NC}  ${YELLOW}(running as sudo)${NC}"
 echo -e "  ${BOLD}SAK Monitor${NC}          ${CYAN}http://localhost:3003${NC}"
 echo -e "  ${BOLD}Thinker${NC}              ${CYAN}http://localhost:8585${NC}"

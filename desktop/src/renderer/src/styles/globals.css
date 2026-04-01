@@ -416,3 +416,194 @@ body,
 .guard-reset-btn:hover {
   background: rgba(248, 113, 113, 0.1);
 }
+
+/* ── Guard Setup ── */
+
+.guard-setup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  padding: 32px;
+  background: #0a0a0a;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+.guard-setup-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #4ade80;
+  letter-spacing: 0.1em;
+}
+
+.guard-setup-hint {
+  font-size: 13px;
+  color: #666;
+}
+
+.guard-pin-input {
+  width: 200px;
+  background: transparent;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  color: #e0e0e0;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 18px;
+  padding: 10px 16px;
+  text-align: center;
+  letter-spacing: 0.3em;
+  outline: none;
+}
+
+.guard-pin-input:focus {
+  border-color: #4ade80;
+}
+
+.guard-setup-error {
+  color: #f87171;
+  font-size: 12px;
+}
+
+.guard-lock-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.guard-lock-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #c0c0c0;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.guard-lock-option input[type="checkbox"] {
+  accent-color: #4ade80;
+  width: 16px;
+  height: 16px;
+}
+
+.guard-setup-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.guard-activate-btn {
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid #4ade80;
+  color: #4ade80;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.guard-activate-btn:hover {
+  background: rgba(74, 222, 128, 0.2);
+}
+
+.guard-cancel-btn {
+  background: transparent;
+  border: 1px solid #2a2a2a;
+  color: #666;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  cursor: pointer;
+}
+
+.guard-cancel-btn:hover {
+  border-color: #666;
+  color: #c0c0c0;
+}
+
+.guard-reset-pin-btn {
+  background: transparent;
+  border: 1px solid #2a2a2a;
+  color: #666;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  cursor: pointer;
+}
+
+.guard-reset-pin-btn:hover {
+  border-color: #f87171;
+  color: #f87171;
+}
+
+/* ── Guard PIN Entry (during guard mode) ── */
+
+.guard-pin-panel {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0a0a0a;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  z-index: 10;
+  min-width: 220px;
+}
+
+.guard-pin-title {
+  color: #4ade80;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+.guard-pin-field {
+  width: 160px;
+  background: transparent;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 20px;
+  padding: 8px 12px;
+  text-align: center;
+  letter-spacing: 0.4em;
+  outline: none;
+}
+
+.guard-pin-field:focus {
+  border-color: #4ade80;
+}
+
+.guard-pin-error {
+  color: #f87171;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+.guard-pin-submit {
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid #4ade80;
+  color: #4ade80;
+  padding: 6px 24px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  cursor: pointer;
+}
+
+.guard-pin-submit:hover {
+  background: rgba(74, 222, 128, 0.2);
+}

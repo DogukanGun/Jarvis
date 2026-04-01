@@ -59,12 +59,9 @@ export default function VisualCheck({ onVerified }: { onVerified?: () => void })
       if (cancelled) return
 
       if ('success' in result && result.success) {
-        setState('enrolled')
-        setStatusMsg('Admin registered! Verifying…')
-        // transition to verification after a brief pause
-        loopRef.current = setTimeout(() => {
-          if (!cancelled) setState('verifying')
-        }, 1500)
+        stop()
+        setState('verified')
+        setStatusMsg('Admin registered. Welcome!')
       } else {
         loopRef.current = setTimeout(tryEnroll, 1500)
       }
@@ -102,12 +99,9 @@ export default function VisualCheck({ onVerified }: { onVerified?: () => void })
         stop()
         setState('verified')
         setStatusMsg('Identity verified. Welcome back!')
-      } else if (result.success && result.data === false) {
-        stop()
-        setState('denied')
-        setStatusMsg('Face not recognised.')
       } else {
-        // face not detected or liveness failed — retry silently
+        // face not recognised or not detected — retry
+        setStatusMsg('Face not recognised. Retrying...')
         loopRef.current = setTimeout(tryVerify, 1500)
       }
     }
