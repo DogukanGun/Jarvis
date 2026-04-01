@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { adminExists, enrollAdmin, verifyAdmin } from '../lib/faceApi'
+import { adminExists, enrollAdmin, verifyAdmin, deleteAdmin } from '../lib/faceApi'
 import { useCamera } from '../hooks/useCamera'
 
 type State =
@@ -16,6 +16,11 @@ export default function VisualCheck({ onVerified }: { onVerified?: () => void })
   const [state, setState] = useState<State>('checking')
   const [statusMsg, setStatusMsg] = useState('Initializing…')
   const loopRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const [showReset, setShowReset] = useState(false)
+  const [resetPassword, setResetPassword] = useState('')
+  const [resetError, setResetError] = useState('')
+  const [resetting, setResetting] = useState(false)
 
   const { videoRef, ready, error: camError, capture, stop } = useCamera()
 
@@ -37,15 +42,22 @@ export default function VisualCheck({ onVerified }: { onVerified?: () => void })
       })
   }, [])
 
-  // Step 2: enroll loop when no admin
+  // Step 2a: transition no_admin → enrolling (separate effect to avoid self-cancel)
   useEffect(() => {
     if (state !== 'no_admin' || !ready) return
+    setState('enrolling')
+  }, [state, ready])
+
+  // Step 2b: enrollment loop — only runs when state is already 'enrolling'
+  // Keeping state stable inside the loop means setState('verified') won't be
+  // swallowed by the effect cleanup cancelling mid-flight.
+  useEffect(() => {
+    if (state !== 'enrolling' || !ready) return
 
     let cancelled = false
 
     async function tryEnroll(): Promise<void> {
       if (cancelled) return
-      setState('enrolling')
       setStatusMsg('Looking for your face…')
 
       const img = capture()
@@ -60,8 +72,8 @@ export default function VisualCheck({ onVerified }: { onVerified?: () => void })
 
       if ('success' in result && result.success) {
         stop()
-        setState('verified')
         setStatusMsg('Admin registered. Welcome!')
+        setState('verified')
       } else {
         loopRef.current = setTimeout(tryEnroll, 1500)
       }
@@ -95,7 +107,7 @@ export default function VisualCheck({ onVerified }: { onVerified?: () => void })
 
       if (cancelled) return
 
-      if (result.success && result.data === true) {
+      if ('success' in result && result.success && result.data === true) {
         stop()
         setState('verified')
         setStatusMsg('Identity verified. Welcome back!')
@@ -119,9 +131,45 @@ export default function VisualCheck({ onVerified }: { onVerified?: () => void })
       const timer = setTimeout(onVerified, 1500)
       return () => clearTimeout(timer)
     }
+    return undefined
   }, [state, onVerified])
 
   const showCamera = ['no_admin', 'enrolling', 'verifying'].includes(state)
+  // 'no_admin' is a transient state (<1 render) before 'enrolling' kicks in
+
+  async function handleReset(): Promise<void> {
+    if (!resetPassword) return
+    setResetting(true)
+    setResetError('')
+    try {
+      const ok = await (window as any).api.verifyAdminPassword(resetPassword)
+      if (!ok) {
+        setResetError('Wrong password.')
+        setResetting(false)
+        return
+      }
+      await deleteAdmin()
+      setShowReset(false)
+      setResetPassword('')
+      setState('checking')
+      setStatusMsg('Initializing…')
+      // Re-run the admin exists check
+      adminExists()
+        .then((exists) => {
+          if (exists) {
+            setState('verifying')
+            setStatusMsg('Please look at the camera to verify your identity.')
+          } else {
+            setState('no_admin')
+            setStatusMsg('No admin registered. Please look at the camera.')
+          }
+        })
+        .catch(() => setState('error'))
+    } catch {
+      setResetError('Reset failed. Try again.')
+      setResetting(false)
+    }
+  }
 
   return (
     <div className="visual-check">
@@ -148,6 +196,40 @@ export default function VisualCheck({ onVerified }: { onVerified?: () => void })
       {/* Result icons */}
       {state === 'verified' && <div className="enrolled-icon">✓</div>}
       {state === 'denied' && <div className="enrolled-icon error">✗</div>}
+
+      {/* Reset enrollment — only shown during verification */}
+      {state === 'verifying' && !showReset && (
+        <button
+          className="reset-link"
+          onClick={() => { setShowReset(true); setResetError('') }}
+        >
+          Reset enrollment
+        </button>
+      )}
+
+      {showReset && (
+        <div className="reset-modal">
+          <p className="reset-label">Enter admin password to reset face enrollment</p>
+          <input
+            type="password"
+            className="reset-input"
+            placeholder="Password"
+            value={resetPassword}
+            onChange={(e) => setResetPassword(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleReset() }}
+            autoFocus
+          />
+          {resetError && <p className="reset-error">{resetError}</p>}
+          <div className="reset-actions">
+            <button className="reset-confirm" onClick={handleReset} disabled={resetting}>
+              {resetting ? 'Verifying…' : 'Confirm Reset'}
+            </button>
+            <button className="reset-cancel" onClick={() => { setShowReset(false); setResetPassword(''); setResetError('') }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

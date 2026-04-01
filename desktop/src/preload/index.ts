@@ -12,6 +12,8 @@ const api = {
     ipcRenderer.on('guard-combo-matched', handler)
     return () => ipcRenderer.removeListener('guard-combo-matched', handler)
   },
+  verifyAdminPassword: (password: string): Promise<boolean> =>
+    ipcRenderer.invoke('verify-admin-password', password),
 }
 
 if (process.contextIsolated) {

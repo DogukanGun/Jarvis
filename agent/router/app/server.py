@@ -208,6 +208,7 @@ async def ws_chat(ws: WebSocket):
             data = json.loads(raw)
             user_id = data.get("user_id", "default")
             message = data.get("message", "")
+            intent_hint = data.get("intent")  # CLI can force intent to skip LLM classification
             visual_frame = data.get("visual_frame")
             visual_feed = None
             if visual_frame:
@@ -237,6 +238,7 @@ async def ws_chat(ws: WebSocket):
             # ----------------------------------------------------------
             from app.graphs.router_graph import router_graph as _router_graph
 
+            _VALID_INTENTS = {"chat", "research", "web_fetch", "security"}
             initial_state = {
                 "user_id": user_id,
                 "message": message,
@@ -244,17 +246,33 @@ async def ws_chat(ws: WebSocket):
                 "tools_used": [],
                 "tool_results": {},
                 "visual_feed": visual_feed,
+                # Pre-set intent if client provided a valid hint (bypasses LLM classification)
+                **({"intent": intent_hint} if intent_hint in _VALID_INTENTS else {}),
             }
 
-            # Phase 1: classify intent + emotion (fast)
+            # ------------------------------------------------------------------
+            # Phase 1: pre-classify — memory retrieval, emotion, visual run
+            # IN PARALLEL via a thread pool so no step blocks another.
+            # analyze_emotion is now rule-based (instant); retrieve_memory is
+            # the only real I/O here (~1-2s).
+            # ------------------------------------------------------------------
+            from concurrent.futures import ThreadPoolExecutor
             from app.graphs.nodes import retrieve_memory, classify_intent as _classify, analyze_emotion, process_visual
 
             def _classify_phase(s):
-                with_memory = {**s, **retrieve_memory(s)}
-                classified = {**with_memory, **_classify(with_memory)}
-                emotion = analyze_emotion(with_memory)
-                visual = process_visual(with_memory)
-                return {**classified, **emotion, **visual}
+                # Fan out: retrieve memory, analyse emotion, process visual — all at once
+                with ThreadPoolExecutor(max_workers=3) as pool:
+                    mem_fut = pool.submit(retrieve_memory, s)
+                    emo_fut = pool.submit(analyze_emotion, s)
+                    vis_fut = pool.submit(process_visual, s)
+                    mem_r = mem_fut.result()
+                    emo_r = emo_fut.result()
+                    vis_r = vis_fut.result()
+
+                merged = {**s, **mem_r, **emo_r, **vis_r}
+                # classify_intent short-circuits when intent is pre-set
+                classified = {**merged, **_classify(merged)}
+                return classified
 
             phase1 = await asyncio.to_thread(_classify_phase, initial_state)
             intent_detected = phase1.get("intent", "chat")
@@ -271,11 +289,17 @@ async def ws_chat(ws: WebSocket):
                 "content": _INTENT_LABELS.get(intent_detected, "Processing..."),
             })
 
-            # Phase 2: run the full graph starting from post-classify state so
-            # classify_intent doesn't run a second time (saves one OpenAI call).
-            result = await asyncio.to_thread(
-                lambda s=phase1: _router_graph.invoke(s),
-            )
+            # ------------------------------------------------------------------
+            # Phase 2: run the full graph.
+            # retrieve_memory and classify_intent short-circuit (already done).
+            # write_memory is fired in the background so it doesn't delay the
+            # WebSocket response to the client.
+            # ------------------------------------------------------------------
+            def _generate_phase(s):
+                from app.graphs.router_graph import router_graph as _g
+                return _g.invoke(s)
+
+            result = await asyncio.to_thread(_generate_phase, phase1)
 
             duration_ms = round((time.time() - t0) * 1000)
 
@@ -300,6 +324,12 @@ async def ws_chat(ws: WebSocket):
                 "visual_context": result.get("visual_context", {}),
                 "duration_ms": duration_ms,
             })
+
+            # Fire-and-forget: persist exchange to memory without blocking client
+            from app.graphs.nodes import write_memory as _write_memory
+            mem_state = {**phase1, "response": response_text}
+            asyncio.create_task(asyncio.to_thread(_write_memory, mem_state))
+
 
     except WebSocketDisconnect:
         logger.info("WebSocket client disconnected")

@@ -15,6 +15,11 @@ export async function enrollAdmin(imageBase64: string): Promise<{ success?: bool
   return res.json()
 }
 
+export async function deleteAdmin(): Promise<{ success?: boolean; error?: string }> {
+  const res = await fetch(`${BASE}/api/admin`, { method: 'DELETE' })
+  return res.json()
+}
+
 export async function verifyAdmin(
   imageBase64: string,
 ): Promise<{ success?: boolean; data?: boolean; error?: string }> {

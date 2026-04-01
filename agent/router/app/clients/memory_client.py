@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class MemoryClient:
     def __init__(self, base_url: Optional[str] = None):
         self.base_url = (base_url or config.MEMORY_BASE_URL).rstrip("/")
-        self.client = httpx.Client(timeout=30.0)
+        self.client = httpx.Client(timeout=5.0)
 
     def query(self, user_id: str, prompt: str, context: Optional[Dict] = None) -> Dict[str, Any]:
         """

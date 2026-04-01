@@ -1,5 +1,8 @@
 import { app, shell, BrowserWindow, ipcMain, systemPreferences, session } from 'electron'
 import { join } from 'path'
+import { homedir } from 'os'
+import { readFileSync } from 'fs'
+import bcrypt from 'bcryptjs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
@@ -59,6 +62,18 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.on('ping', () => console.log('pong'))
+
+  // Verify the CLI admin password against the bcrypt hash in ~/.jarvis/config.json
+  ipcMain.handle('verify-admin-password', async (_event, password: string): Promise<boolean> => {
+    try {
+      const configPath = join(homedir(), '.jarvis', 'config.json')
+      const config = JSON.parse(readFileSync(configPath, 'utf8')) as { passwordHash?: string }
+      if (!config.passwordHash) return false
+      return bcrypt.compare(password, config.passwordHash)
+    } catch {
+      return false
+    }
+  })
 
   ipcMain.on('minimize-window', () => {
     const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
