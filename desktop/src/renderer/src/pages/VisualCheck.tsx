@@ -1,118 +1,53 @@
-import { useEffect, useRef, useState } from 'react'
-import { adminExists, enrollAdmin, verifyAdmin } from '../lib/faceApi'
-import { useCamera } from '../hooks/useCamera'
+import { useEffect, useState } from 'react'
+import { isBiometricAvailable, verify } from '../lib/biometricAuth'
 
-type State =
-  | 'checking'
-  | 'no_admin'
-  | 'enrolling'
-  | 'enrolled'
-  | 'verifying'
-  | 'verified'
-  | 'denied'
-  | 'error'
+type State = 'checking' | 'verifying' | 'verified' | 'unavailable' | 'error'
 
 export default function VisualCheck({ onVerified }: { onVerified?: () => void }): React.JSX.Element {
   const [state, setState] = useState<State>('checking')
   const [statusMsg, setStatusMsg] = useState('Initializing…')
-  const loopRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const { videoRef, ready, error: camError, capture, stop } = useCamera()
-
-  // Step 1: check if admin exists on mount
   useEffect(() => {
-    adminExists()
-      .then((exists) => {
-        if (exists) {
-          setState('verifying')
-          setStatusMsg('Please look at the camera to verify your identity.')
-        } else {
-          setState('no_admin')
-          setStatusMsg('No admin registered. Please look at the camera.')
+    let cancelled = false
+
+    async function run(): Promise<void> {
+      const available = await isBiometricAvailable()
+
+      if (!available) {
+        if (!cancelled) {
+          setState('unavailable')
+          setStatusMsg('Biometric authentication is not available on this device. Proceeding…')
+          setTimeout(() => onVerified?.(), 1500)
         }
-      })
-      .catch(() => {
-        setState('error')
-        setStatusMsg('Could not reach the Face API. Make sure it is running on port 8400.')
-      })
-  }, [])
-
-  // Step 2: enroll loop when no admin
-  useEffect(() => {
-    if (state !== 'no_admin' || !ready) return
-
-    let cancelled = false
-
-    async function tryEnroll(): Promise<void> {
-      if (cancelled) return
-      setState('enrolling')
-      setStatusMsg('Looking for your face…')
-
-      const img = capture()
-      if (!img) {
-        loopRef.current = setTimeout(tryEnroll, 1500)
         return
       }
 
-      const result = await enrollAdmin(img).catch(() => ({ error: 'network error' }))
-
       if (cancelled) return
+      setState('verifying')
+      setStatusMsg('Verify your identity…')
 
-      if ('success' in result && result.success) {
-        stop()
-        setState('verified')
-        setStatusMsg('Admin registered. Welcome!')
-      } else {
-        loopRef.current = setTimeout(tryEnroll, 1500)
+      try {
+        const ok = await verify()
+        if (cancelled) return
+
+        if (ok) {
+          setState('verified')
+          setStatusMsg('Identity verified. Welcome back!')
+        } else {
+          setState('error')
+          setStatusMsg('Verification cancelled or failed. Please try again.')
+        }
+      } catch {
+        if (!cancelled) {
+          setState('error')
+          setStatusMsg('Verification failed. Please try again.')
+        }
       }
     }
 
-    loopRef.current = setTimeout(tryEnroll, 1000)
-
-    return () => {
-      cancelled = true
-      if (loopRef.current) clearTimeout(loopRef.current)
-    }
-  }, [state, ready])
-
-  // Step 3: verification loop
-  useEffect(() => {
-    if (state !== 'verifying' || !ready) return
-
-    let cancelled = false
-
-    async function tryVerify(): Promise<void> {
-      if (cancelled) return
-      setStatusMsg('Verifying your identity…')
-
-      const img = capture()
-      if (!img) {
-        loopRef.current = setTimeout(tryVerify, 1500)
-        return
-      }
-
-      const result = await verifyAdmin(img).catch(() => ({ error: 'network error' }))
-
-      if (cancelled) return
-
-      if (result.success && result.data === true) {
-        stop()
-        setState('verified')
-        setStatusMsg('Identity verified. Welcome back!')
-      } else {
-        // face not recognised or not detected — retry
-        setStatusMsg('Face not recognised. Retrying...')
-        loopRef.current = setTimeout(tryVerify, 1500)
-      }
-    }
-
-    loopRef.current = setTimeout(tryVerify, 1000)
-
-    return () => {
-      cancelled = true
-      if (loopRef.current) clearTimeout(loopRef.current)
-    }
-  }, [state, ready])
+    run()
+    return () => { cancelled = true }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (state === 'verified' && onVerified) {
@@ -121,33 +56,59 @@ export default function VisualCheck({ onVerified }: { onVerified?: () => void })
     }
   }, [state, onVerified])
 
-  const showCamera = ['no_admin', 'enrolling', 'verifying'].includes(state)
+  const retry = async (): Promise<void> => {
+    setState('verifying')
+    setStatusMsg('Verify your identity…')
+    try {
+      const ok = await verify()
+      if (ok) {
+        setState('verified')
+        setStatusMsg('Identity verified. Welcome back!')
+      } else {
+        setState('error')
+        setStatusMsg('Verification cancelled. Please try again.')
+      }
+    } catch {
+      setState('error')
+      setStatusMsg('Verification failed. Please try again.')
+    }
+  }
 
   return (
     <div className="visual-check">
-      {/* Status message */}
       <p
         className={`status-text ${
-          state === 'verified' || state === 'enrolled'
+          state === 'verified'
             ? 'success'
-            : state === 'error' || state === 'denied'
+            : state === 'error'
               ? 'error'
               : ''
         }`}
       >
-        {camError ?? statusMsg}
+        {statusMsg}
       </p>
 
-      {/* Camera feed */}
-      <div className={`camera-container ${showCamera ? 'visible' : 'hidden'}`}>
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-        <video ref={videoRef} autoPlay playsInline muted className="camera-feed" />
-        {(state === 'enrolling' || state === 'verifying') && <div className="scan-overlay" />}
-      </div>
+      {(state === 'checking' || state === 'verifying') && (
+        <div className="biometric-icon">
+          <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 10v4" />
+            <path d="M7.5 8a5.5 5.5 0 0 1 9 0" />
+            <path d="M5 6a9 9 0 0 1 14 0" />
+            <path d="M7.5 16a5.5 5.5 0 0 0 9 0" />
+            <path d="M5 18a9 9 0 0 0 14 0" />
+            <circle cx="12" cy="12" r="1" />
+          </svg>
+        </div>
+      )}
 
-      {/* Result icons */}
-      {state === 'verified' && <div className="enrolled-icon">✓</div>}
-      {state === 'denied' && <div className="enrolled-icon error">✗</div>}
+      {state === 'verified' && <div className="enrolled-icon">&#x2713;</div>}
+
+      {state === 'error' && (
+        <>
+          <div className="enrolled-icon error">&#x2717;</div>
+          <button className="retry-btn" onClick={retry}>Retry</button>
+        </>
+      )}
     </div>
   )
 }

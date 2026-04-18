@@ -14,15 +14,17 @@ CLASSIFICATION_PROMPT = """You are an intent classifier for an AI assistant with
 2. **research** - Deep research on a topic (starts a multi-phase research pipeline that produces papers). Use when user asks to research, investigate, or study something in depth.
 3. **web_fetch** - Fetch content from a specific URL. Use when user provides a URL or asks to read/fetch a webpage.
 4. **security** - Network security tools, WiFi auditing, penetration testing, vulnerability scanning, password cracking, MITM analysis, exploitation. Use when user asks to scan, audit, hack, crack, intercept, exploit, pentest, or use security tools.
+5. **visual** - User asks about what they see, what's happening around them, what they're doing, what's on their screen, or asks you to look at/describe something from the camera. Use when the user wants you to observe or describe the visual scene.
 
 Classify the user's message and extract any arguments.
 
 RESPOND ONLY with valid JSON in this exact format:
-{{"intent": "chat|research|web_fetch|security", "tool_args": {{}}}}
+{{"intent": "chat|research|web_fetch|security|visual", "tool_args": {{}}}}
 
 For research: {{"intent": "research", "tool_args": {{"topic": "the research topic"}}}}
 For web_fetch: {{"intent": "web_fetch", "tool_args": {{"url": "https://..."}}}}
 For security: {{"intent": "security", "tool_args": {{"target_tools": null, "parameters": null}}}}
+For visual: {{"intent": "visual", "tool_args": {{}}}}
 For chat: {{"intent": "chat", "tool_args": {{}}}}
 
 User message: {message}
@@ -34,7 +36,7 @@ def classify_intent(state: RouterGraphState) -> Dict[str, Any]:
     """Use LLM to classify the user's intent."""
     # If intent was already set (e.g. by the WS handler's phase-1 pre-classify),
     # skip the LLM call to avoid a redundant round-trip.
-    if state.get("intent") in ("chat", "research", "web_fetch", "security"):
+    if state.get("intent") in ("chat", "research", "web_fetch", "security", "visual"):
         logger.info(f"Intent already classified: {state['intent']}, skipping LLM call")
         return {}
 
@@ -80,7 +82,7 @@ def classify_intent(state: RouterGraphState) -> Dict[str, Any]:
         tool_args = parsed.get("tool_args", {})
 
         # Validate intent
-        if intent not in ("chat", "research", "web_fetch", "security"):
+        if intent not in ("chat", "research", "web_fetch", "security", "visual"):
             intent = "chat"
 
         logger.info(f"Classified intent: {intent}, args: {tool_args}")

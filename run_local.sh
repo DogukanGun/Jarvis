@@ -199,14 +199,7 @@ info "Starting router..."
     > "$LOG_DIR/router.log" 2>&1 &
 PIDS+=($!)
 
-# 6. Face API
-DIR="$ROOT/agent/face"
-setup_venv "$DIR" "$DIR/requirements.txt"
-info "Starting face-api..."
-( cd "$DIR" && AGENT_ID=face-api PORT=8400 \
-    "$DIR/.venv/bin/python" run_server.py ) \
-    > "$LOG_DIR/face-api.log" 2>&1 &
-PIDS+=($!)
+# 6. Face API — replaced by local biometric auth (WebAuthn), no service needed
 
 # 7. Vision Service
 DIR="$ROOT/agent/vision"

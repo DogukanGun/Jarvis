@@ -60,6 +60,25 @@ app.whenReady().then(async () => {
 
   ipcMain.on('ping', () => console.log('pong'))
 
+  ipcMain.handle('biometric-available', () => {
+    if (process.platform === 'darwin') {
+      return systemPreferences.canPromptTouchID()
+    }
+    return false
+  })
+
+  ipcMain.handle('biometric-verify', async (_event, reason: string) => {
+    if (process.platform === 'darwin') {
+      try {
+        await systemPreferences.promptTouchID(reason)
+        return true
+      } catch {
+        return false
+      }
+    }
+    return false
+  })
+
   ipcMain.on('minimize-window', () => {
     const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
     if (win) win.minimize()

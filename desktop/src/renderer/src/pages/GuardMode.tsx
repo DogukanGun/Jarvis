@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { verifyAdmin } from '../lib/faceApi'
+import { verify as verifyBiometric } from '../lib/biometricAuth'
 import { useCamera } from '../hooks/useCamera'
 import { useWebSocket } from '../hooks/useWebSocket'
 
@@ -10,7 +10,7 @@ const PIN_KEY = 'jarvis_guard_pin'
 const STATUS_LABEL: Record<GuardStatus, string> = {
   watching: 'watching',
   'pin-entry': 'enter PIN',
-  verifying: 'verifying face',
+  verifying: 'verifying identity',
   verified: 'identity confirmed',
   alert: 'INTRUDER DETECTED',
 }
@@ -140,49 +140,28 @@ export default function GuardMode({
       return
     }
 
-    // Correct PIN — give 4 seconds for face positioning
     setPinError('')
     setGuardStatus('verifying')
-    setCountdown(4)
-
-    let c = 4
-    const countdownInterval = setInterval(() => {
-      c--
-      setCountdown(c)
-      if (c <= 0) {
-        clearInterval(countdownInterval)
-        runFaceVerification()
-      }
-    }, 1000)
+    runBiometricVerification()
   }
 
-  const runFaceVerification = async () => {
-    const frame = capture() ?? pendingFrame
-    if (!frame) {
-      setGuardStatus('alert')
-      setIntruderPhoto(null)
-      triggerAlarm(null)
-      return
-    }
-
+  const runBiometricVerification = async () => {
     try {
-      const result = await verifyAdmin(frame)
+      const ok = await verifyBiometric()
 
-      if (result.success && result.data === true) {
-        // Admin verified — deactivate guard, go to chat
+      if (ok) {
         setGuardStatus('verified')
         setTimeout(() => {
           windowApi?.deactivateGuard?.()
           onDeactivate()
         }, 1000)
       } else {
-        // Face doesn't match — intruder
+        const frame = capture() ?? pendingFrame
         setGuardStatus('alert')
         setIntruderPhoto(frame)
         triggerAlarm(frame)
       }
     } catch {
-      // Face service error — retry
       setGuardStatus('watching')
       windowApi?.minimizeWindow?.()
     }
@@ -226,7 +205,7 @@ export default function GuardMode({
       <div className="guard-status-bar">
         <span className={`guard-status-indicator ${guardStatus}`}>
           {guardStatus === 'verifying' && countdown > 0
-            ? `look at camera... ${countdown}`
+            ? `preparing verification... ${countdown}`
             : STATUS_LABEL[guardStatus]}
         </span>
         {guardStatus !== 'alert' && (

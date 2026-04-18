@@ -28,7 +28,8 @@ EMOTIONAL AWARENESS:
 VISUAL AWARENESS:
 - If visual context is provided, you can see what the user sees through their camera.
 - Reference detected objects naturally when relevant to the conversation.
-- Do not list objects unprompted unless the user asks what you see."""
+- Do not list objects unprompted unless the user asks what you see.
+- When an image is attached, you are LOOKING at the user's live camera feed. Describe what you see naturally and answer their question based on the actual image content."""
 
 
 def generate_response(state: RouterGraphState) -> Dict[str, Any]:
@@ -194,6 +195,60 @@ def generate_response(state: RouterGraphState) -> Dict[str, Any]:
                 "findings": sk_result.get("findings", []),
                 "report": sk_result.get("report", {}),
             }
+
+    # For visual intent: send the camera frame to a vision-capable LLM
+    visual_feed = state.get("visual_feed")
+    frame_b64 = ""
+    if visual_feed and isinstance(visual_feed.get("data"), dict):
+        frame_b64 = visual_feed["data"].get("frame_b64", "")
+
+    if intent == "visual":
+        if not frame_b64:
+            return {"response": "I can't see anything right now — make sure your camera is active and try again."}
+        try:
+            client = httpx.Client(timeout=60.0)
+            context_str = "\n".join(context_parts) if context_parts else ""
+            text_part = f"{context_str}\n\nUser: {message}" if context_str else f"User: {message}"
+            if config.LLM_PROVIDER == "openai":
+                user_content = [
+                    {"type": "text", "text": text_part},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{frame_b64}"}},
+                ]
+                resp = client.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {config.OPENAI_API_KEY}"},
+                    json={
+                        "model": config.LLM_MODEL,
+                        "messages": [
+                            {"role": "system", "content": RESPONSE_SYSTEM_PROMPT},
+                            {"role": "user", "content": user_content},
+                        ],
+                        "temperature": config.LLM_TEMPERATURE,
+                        "max_tokens": 1024,
+                    },
+                )
+                resp.raise_for_status()
+                response_text = resp.json()["choices"][0]["message"]["content"].strip()
+            else:
+                resp = client.post(
+                    f"{config.OLLAMA_BASE_URL}/api/chat",
+                    json={
+                        "model": config.LLM_MODEL,
+                        "messages": [
+                            {"role": "system", "content": RESPONSE_SYSTEM_PROMPT},
+                            {"role": "user", "content": text_part, "images": [frame_b64]},
+                        ],
+                        "stream": False,
+                        "options": {"temperature": config.LLM_TEMPERATURE},
+                    },
+                )
+                resp.raise_for_status()
+                response_text = resp.json().get("message", {}).get("content", "").strip()
+            client.close()
+            return {"response": response_text or "I could see the image but couldn't generate a description. Please try again."}
+        except Exception as e:
+            logger.error(f"Visual response generation failed: {e}")
+            return {"response": f"I had trouble processing the image: {e}"}
 
     context_str = "\n".join(context_parts) if context_parts else ""
 

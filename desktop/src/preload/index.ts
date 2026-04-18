@@ -12,6 +12,8 @@ const api = {
     ipcRenderer.on('guard-combo-matched', handler)
     return () => ipcRenderer.removeListener('guard-combo-matched', handler)
   },
+  biometricAvailable: (): Promise<boolean> => ipcRenderer.invoke('biometric-available'),
+  biometricVerify: (reason: string): Promise<boolean> => ipcRenderer.invoke('biometric-verify', reason),
 }
 
 if (process.contextIsolated) {

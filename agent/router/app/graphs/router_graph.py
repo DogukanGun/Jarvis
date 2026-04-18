@@ -31,6 +31,8 @@ def _intent_router(state: RouterGraphState) -> str:
         return "web_fetch"
     elif intent == "security":
         return "security"
+    elif intent == "visual":
+        return "visual"
     else:
         return "chat"
 
@@ -44,6 +46,7 @@ def create_router_graph():
     2. classify_intent - LLM classifies intent + extracts tool args
     3. [conditional] - Route to tool node or straight to response
        - "chat" -> generate_response
+       - "visual" -> generate_response (with image sent to GPT-4o vision)
        - "research" -> invoke_thinker -> generate_response
        - "web_fetch" -> invoke_web_fetcher -> generate_response
        - "security" -> invoke_swiss_knife -> generate_response
@@ -74,6 +77,7 @@ def create_router_graph():
         _intent_router,
         {
             "chat": "generate_response",
+            "visual": "generate_response",
             "research": "invoke_thinker",
             "web_fetch": "invoke_web_fetcher",
             "security": "invoke_swiss_knife",
