@@ -63,7 +63,9 @@ def create_router_graph():
     graph.add_node("invoke_web_fetcher", invoke_web_fetcher)
     graph.add_node("invoke_swiss_knife", invoke_swiss_knife)
     graph.add_node("generate_response", generate_response)
-    graph.add_node("write_memory", write_memory)
+    # write_memory is intentionally NOT in the graph — it is fired as a
+    # background task in server.py after the WebSocket response is sent,
+    # so it never blocks the client from receiving the answer.
 
     # Entry point
     graph.set_entry_point("retrieve_memory")
@@ -89,9 +91,8 @@ def create_router_graph():
     graph.add_edge("invoke_web_fetcher", "generate_response")
     graph.add_edge("invoke_swiss_knife", "generate_response")
 
-    # Response -> write_memory -> END
-    graph.add_edge("generate_response", "write_memory")
-    graph.add_edge("write_memory", END)
+    # Response -> END (write_memory happens async in server.py)
+    graph.add_edge("generate_response", END)
 
     return graph.compile()
 
@@ -123,6 +124,8 @@ def run_router(user_id: str, message: str, conversation_history: list = None) ->
     try:
         result = router_graph.invoke(initial_state)
         logger.info(f"Router completed: intent={result.get('intent')}, tools={result.get('tools_used')}")
+        # write_memory is not in the graph; call it here for the HTTP endpoint
+        write_memory(result)
         return result
     except Exception as e:
         logger.error(f"Router graph error: {e}")

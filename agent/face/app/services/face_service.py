@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 engine = FaceEngine()
 anti_spoof = AntiSpoofEngine(ANTI_SPOOF_MODEL_DIR)
-threshold = 0.8
+threshold = 0.4  # insightface buffalo_l: same-person cosine similarity is typically 0.3-0.5
 
 
 def _check_liveness(image, bbox):

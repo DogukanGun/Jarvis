@@ -40,6 +40,15 @@ async def register_face(payload: ImagePayload):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@face_router.delete("/admin")
+async def delete_admin():
+    try:
+        FaceRecognitionService.delete_admin()
+        return {"success": True, "message": "Admin face deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @face_router.post("/admin/verify")
 async def validate_admin_face(payload: ImagePayload):
     try:

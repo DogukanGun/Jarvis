@@ -3,15 +3,15 @@
     "status": "idle",
     "graphs": {
       "main_graph": {
-        "runs": 10,
+        "runs": 21,
         "errors": 0,
-        "last_run": "2026-03-28T23:15:16.244+00:00",
+        "last_run": "2026-04-01T11:15:57.425+00:00",
         "active_node": null
       },
       "memory_write_graph": {
-        "runs": 9,
+        "runs": 20,
         "errors": 0,
-        "last_run": "2026-03-28T23:15:39.092+00:00",
+        "last_run": "2026-04-01T11:16:33.624+00:00",
         "active_node": null
       },
       "reflection_graph": {
@@ -28,15 +28,15 @@
       }
     },
     "metrics": {
-      "total_episodes": 7,
+      "total_episodes": 16,
       "total_promotions": 0,
       "total_rejections": 0,
       "total_reflections": 0,
-      "total_searches": 10,
-      "avg_write_latency_ms": 28.9,
+      "total_searches": 21,
+      "avg_write_latency_ms": 84.6,
       "avg_search_latency_ms": 0,
-      "dedup_hit_count": 2,
-      "dedup_total_count": 2,
+      "dedup_hit_count": 4,
+      "dedup_total_count": 4,
       "secrets_redacted": 0
     },
     "services": {
@@ -516,7 +516,529 @@
       "type": "write_completed",
       "timestamp": "2026-03-28T23:15:39.118+00:00",
       "latency_ms": 22
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T08:45:00.727+00:00",
+      "graph": "main_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-04-01T08:45:00.810+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 0,
+      "sources": []
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T08:46:17.167+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T08:46:17.169+00:00",
+      "graph": "main_graph",
+      "duration_ms": 76433
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T08:46:17.189+00:00",
+      "graph": "main_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-04-01T08:46:17.200+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "7602f564-d14c-496a-a491-bc3f6c858432",
+      "user_id": "jarvis-cli",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-04-01T08:46:17.207+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 1,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T08:46:17.229+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 54
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-04-01T08:46:17.230+00:00",
+      "latency_ms": 54
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T08:46:50.240+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T08:46:50.242+00:00",
+      "graph": "main_graph",
+      "duration_ms": 33052
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T08:46:50.257+00:00",
+      "graph": "main_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-04-01T08:46:50.261+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "7efc85c1-05af-4666-9400-79f5f1af511c",
+      "user_id": "jarvis-cli",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-04-01T08:46:50.269+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 0,
+      "sources": []
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T08:46:50.274+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 30
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-04-01T08:46:50.275+00:00",
+      "latency_ms": 30
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T08:48:10.633+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T08:48:10.635+00:00",
+      "graph": "main_graph",
+      "duration_ms": 80377
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-04-01T08:48:10.662+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "a9d170fc-4770-4c26-b78c-9d2dcc51cc94",
+      "user_id": "jarvis-cli",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T08:48:10.883+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 240
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-04-01T08:48:10.884+00:00",
+      "latency_ms": 240
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T09:09:51.625+00:00",
+      "graph": "main_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-04-01T09:09:51.733+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 2,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T09:11:12.231+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T09:11:12.233+00:00",
+      "graph": "main_graph",
+      "duration_ms": 80598
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T09:11:12.266+00:00",
+      "graph": "main_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "episode_deduplicated",
+      "timestamp": "2026-04-01T09:11:12.293+00:00",
+      "graph": "memory_write_graph",
+      "node": "dedupe_lookup",
+      "existing_episode_id": "7efc85c1-05af-4666-9400-79f5f1af511c",
+      "reinforcement_count": 1
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-04-01T09:11:12.350+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 1,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T09:11:12.368+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 132
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-04-01T09:11:12.368+00:00",
+      "latency_ms": 132
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T09:11:40.966+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T09:11:40.967+00:00",
+      "graph": "main_graph",
+      "duration_ms": 28698
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-04-01T09:11:40.995+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "1899d517-3b6e-4c82-b6f1-38a014efec0a",
+      "user_id": "jarvis-cli",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T09:11:41.032+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 62
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-04-01T09:11:41.033+00:00",
+      "latency_ms": 62
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T09:26:07.154+00:00",
+      "graph": "main_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-04-01T09:26:07.223+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 2,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T09:28:07.692+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T09:28:07.740+00:00",
+      "graph": "main_graph",
+      "duration_ms": 120557
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T09:28:07.893+00:00",
+      "graph": "main_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-04-01T09:28:07.969+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "a8d589b8-c471-4f43-a3ad-d889d088da51",
+      "user_id": "jarvis-cli",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-04-01T09:28:08.021+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 2,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T09:28:08.294+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 546
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-04-01T09:28:08.294+00:00",
+      "latency_ms": 546
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T09:29:59.223+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T09:29:59.230+00:00",
+      "graph": "main_graph",
+      "duration_ms": 111337
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-04-01T09:29:59.426+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "e2396346-6433-4d42-b008-620336f29d23",
+      "user_id": "jarvis-cli",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T09:29:59.508+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 218
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-04-01T09:29:59.508+00:00",
+      "latency_ms": 218
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T09:49:42.717+00:00",
+      "graph": "main_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-04-01T09:49:42.859+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 3,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T09:50:07.304+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T09:50:07.306+00:00",
+      "graph": "main_graph",
+      "duration_ms": 24575
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T09:50:07.324+00:00",
+      "graph": "main_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "episode_deduplicated",
+      "timestamp": "2026-04-01T09:50:07.335+00:00",
+      "graph": "memory_write_graph",
+      "node": "dedupe_lookup",
+      "existing_episode_id": "7602f564-d14c-496a-a491-bc3f6c858432",
+      "reinforcement_count": 1
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-04-01T09:50:07.341+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 3,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T09:50:07.351+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 37
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-04-01T09:50:07.351+00:00",
+      "latency_ms": 37
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T09:50:40.835+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T09:50:40.835+00:00",
+      "graph": "main_graph",
+      "duration_ms": 33511
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-04-01T09:50:40.844+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "a6e375e3-fadf-4e7e-869e-fd7a08d850e9",
+      "user_id": "jarvis-cli",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T09:50:40.898+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 61
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-04-01T09:50:40.898+00:00",
+      "latency_ms": 61
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T11:14:54.901+00:00",
+      "graph": "main_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-04-01T11:14:55.018+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 3,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T11:15:57.409+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T11:15:57.410+00:00",
+      "graph": "main_graph",
+      "duration_ms": 62500
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T11:15:57.425+00:00",
+      "graph": "main_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-04-01T11:15:57.434+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "0a285320-4a68-4829-8c19-f4531d60d6bc",
+      "user_id": "jarvis-cli",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-04-01T11:15:57.442+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 4,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T11:15:57.457+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 40
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-04-01T11:15:57.457+00:00",
+      "latency_ms": 40
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-04-01T11:16:33.624+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "jarvis-cli"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T11:16:33.624+00:00",
+      "graph": "main_graph",
+      "duration_ms": 36198
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-04-01T11:16:33.631+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "84fe34f5-f495-4a2b-84d0-d5ed3094b3ff",
+      "user_id": "jarvis-cli",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-04-01T11:16:33.637+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 12
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-04-01T11:16:33.638+00:00",
+      "latency_ms": 12
     }
   ],
-  "saved_at": "2026-03-28T23:15:39.118+00:00"
+  "saved_at": "2026-04-01T11:16:33.638+00:00"
 }

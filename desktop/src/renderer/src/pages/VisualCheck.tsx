@@ -54,6 +54,7 @@ export default function VisualCheck({ onVerified }: { onVerified?: () => void })
       const timer = setTimeout(onVerified, 1500)
       return () => clearTimeout(timer)
     }
+    return undefined
   }, [state, onVerified])
 
   const retry = async (): Promise<void> => {

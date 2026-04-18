@@ -1,5 +1,8 @@
 import { app, shell, BrowserWindow, ipcMain, systemPreferences, session } from 'electron'
 import { join } from 'path'
+import { homedir } from 'os'
+import { readFileSync } from 'fs'
+import bcrypt from 'bcryptjs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 

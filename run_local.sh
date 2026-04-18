@@ -3,6 +3,11 @@
 #  Jarvis – Local macOS Run Script
 #  Keeps Kafka/MinIO/Ollama in Docker, runs all agents natively so scapy
 #  gets direct access to the host network interfaces.
+#
+#  Usage:
+#    ./run_local.sh --ui web        # Next.js chat UI + monitors
+#    ./run_local.sh --ui cli        # Ink terminal CLI (foreground)
+#    ./run_local.sh --ui desktop    # Electron desktop app
 # =============================================================================
 set -uo pipefail
 
@@ -24,6 +29,17 @@ info()    { echo -e "${BLUE}[•]${NC} $*"; }
 ok()      { echo -e "${GREEN}[✓]${NC} $*"; }
 warn()    { echo -e "${YELLOW}[!]${NC} $*"; }
 die()     { echo -e "${RED}[✗]${NC} $*"; exit 1; }
+
+usage() {
+    echo -e "${BOLD}Usage:${NC} $0 --ui <web|cli|desktop>"
+    echo ""
+    echo -e "  ${CYAN}--ui web${NC}      Start Next.js chat UI + agent monitors"
+    echo -e "  ${CYAN}--ui cli${NC}      Start Ink terminal CLI (takes over the terminal)"
+    echo -e "  ${CYAN}--ui desktop${NC}  Start Electron desktop app"
+    echo ""
+    echo "  All options start the full Python backend stack."
+    exit 0
+}
 
 wait_for_port() {
     local name=$1 port=$2 max=${3:-45}
@@ -58,11 +74,36 @@ cleanup() {
 trap cleanup SIGINT SIGTERM EXIT
 
 # =============================================================================
+#  PARSE FLAGS
+# =============================================================================
+UI_MODE=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --ui)       UI_MODE="${2:-}"; shift 2 ;;
+        --ui=*)     UI_MODE="${1#--ui=}"; shift ;;
+        -h|--help)  usage ;;
+        *)          die "Unknown argument: $1. Run with --help for usage." ;;
+    esac
+done
+
+if [[ -z "$UI_MODE" ]]; then
+    echo -e "${RED}[✗]${NC} Missing required flag: --ui <web|cli|desktop>"
+    echo ""
+    usage
+fi
+
+case "$UI_MODE" in
+    web|cli|desktop) ;;
+    *) die "Unknown --ui mode: '$UI_MODE'. Choose web, cli, or desktop." ;;
+esac
+
+# =============================================================================
 #  HEADER
 # =============================================================================
 echo -e "${BOLD}${CYAN}"
 echo "  ╔════════════════════════════════════════╗"
 echo "  ║        Jarvis – Local macOS Run        ║"
+printf "  ║     UI mode: %-26s║\n" "$UI_MODE"
 echo "  ╚════════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -70,15 +111,34 @@ echo -e "${NC}"
 #  PREREQUISITES
 # =============================================================================
 info "Checking prerequisites..."
-for cmd in python3 node npm docker nc; do
+for cmd in python3 docker nc; do
     command -v "$cmd" &>/dev/null || die "Missing required tool: $cmd"
 done
-ok "python3 $(python3 --version 2>&1 | cut -d' ' -f2)  |  node $(node --version)  |  npm $(npm --version)"
+
+# bun (needed for cli mode; optional otherwise but we check anyway)
+BUN_BIN=""
+if command -v bun &>/dev/null; then
+    BUN_BIN="$(command -v bun)"
+elif [ -x "$HOME/.bun/bin/bun" ]; then
+    BUN_BIN="$HOME/.bun/bin/bun"
+fi
+
+if [[ "$UI_MODE" == "cli" && -z "$BUN_BIN" ]]; then
+    die "bun is required for --ui cli. Install: curl -fsSL https://bun.sh/install | bash"
+fi
+
+# node/npm needed for web mode
+if [[ "$UI_MODE" == "web" || "$UI_MODE" == "desktop" ]]; then
+    for cmd in node npm; do
+        command -v "$cmd" &>/dev/null || die "Missing required tool: $cmd (needed for --ui $UI_MODE)"
+    done
+fi
+
+ok "Prerequisites OK"
 
 # =============================================================================
 #  ENVIRONMENT
 # =============================================================================
-# Load .env if present
 if [ -f "$ROOT/.env" ]; then
     set -a; source "$ROOT/.env"; set +a
     ok "Loaded .env"
@@ -87,7 +147,6 @@ fi
 [ -z "${OPENAI_API_KEY:-}" ] && die "OPENAI_API_KEY is not set. Add it to .env or: export OPENAI_API_KEY=sk-..."
 OPENAI_MODEL="${OPENAI_MODEL:-gpt-4o}"
 
-# Shared env for all local services
 export KAFKA_BROKERS="localhost:9094"
 export MINIO_ENDPOINT="localhost:9000"
 export MINIO_ACCESS_KEY="minioadmin"
@@ -101,7 +160,6 @@ export OPENAI_MODEL="$OPENAI_MODEL"
 export ENABLE_GROUP_LAYER="true"
 export GROUP_ID="jarvis-main"
 
-# Inter-service URLs (all on localhost now)
 export SWISS_KNIFE_BASE_URL="http://localhost:8787"
 export THINKER_BASE_URL="http://localhost:8585"
 export MEMORY_BASE_URL="http://localhost:8686"
@@ -110,7 +168,7 @@ export VISION_BASE_URL="http://localhost:8500"
 export NEXT_PUBLIC_ROUTER_URL="http://localhost:8888"
 
 # =============================================================================
-#  DOCKER INFRASTRUCTURE (Kafka, MinIO, Ollama only)
+#  DOCKER INFRASTRUCTURE
 # =============================================================================
 info "Stopping any running agent containers (keeping infra)..."
 cd "$ROOT"
@@ -140,17 +198,17 @@ setup_venv() {
         info "  Creating venv for $(basename "$dir")..."
         python3 -m venv "$venv"
     fi
-    info "  Installing deps for $(basename "$dir") (this may take a minute on first run)..."
+    info "  Installing deps for $(basename "$dir")..."
     "$venv/bin/pip" install -q --upgrade pip
     "$venv/bin/pip" install -q -r "$req"
     ok "  $(basename "$dir") deps ready"
 }
 
 # =============================================================================
-#  PYTHON SERVICES
+#  PYTHON BACKEND SERVICES  (always started regardless of --ui)
 # =============================================================================
 echo ""
-echo -e "${BOLD}── Python services ──────────────────────────────────${NC}"
+echo -e "${BOLD}── Python backend ───────────────────────────────────${NC}"
 
 # 1. Memory Worker
 DIR="$ROOT/agent/memory/episodic"
@@ -211,7 +269,7 @@ info "Starting vision..."
     > "$LOG_DIR/vision.log" 2>&1 &
 PIDS+=($!)
 
-# 8. Swiss Army Knife — needs sudo so scapy can open raw sockets
+# 8. Swiss Army Knife (sudo for scapy raw sockets)
 DIR="$ROOT/agent/swiss-army-knife"
 setup_venv "$DIR" "$DIR/requirements.txt"
 info "Starting swiss-army-knife ${YELLOW}(sudo required for scapy)${NC}..."
@@ -225,7 +283,6 @@ info "Starting swiss-army-knife ${YELLOW}(sudo required for scapy)${NC}..."
     > "$LOG_DIR/swiss-army-knife.log" 2>&1 &
 SUDO_PIDS+=($!)
 
-# 8. Swiss Army Knife Kafka Consumer — also needs sudo
 info "Starting swiss-army-knife-kafka-consumer ${YELLOW}(sudo)${NC}..."
 ( cd "$DIR" && sudo -E \
     OPENAI_API_KEY="$OPENAI_API_KEY" OPENAI_MODEL="$OPENAI_MODEL" \
@@ -238,7 +295,7 @@ SUDO_PIDS+=($!)
 
 # ── Wait for Python services ──────────────────────────────────────────────────
 echo ""
-info "Waiting for Python services..."
+info "Waiting for Python services to be ready..."
 wait_for_port "memory-worker"    8686
 wait_for_port "web-fetcher"      8099
 wait_for_port "thinker"          8585
@@ -248,15 +305,15 @@ wait_for_port "face-api"         8400
 wait_for_port "vision"           8500
 
 # =============================================================================
-#  NODE.JS UIs
+#  UI LAYER  (selected by --ui flag)
 # =============================================================================
 echo ""
-echo -e "${BOLD}── UI services ──────────────────────────────────────${NC}"
+echo -e "${BOLD}── UI: $UI_MODE ─────────────────────────────────────────${NC}"
 
-start_ui() {
+start_next_ui() {
     local name=$1 dir=$2 port=$3
     if [ ! -d "$dir/node_modules" ]; then
-        info "  npm install for $name (first run, may take a while)..."
+        info "  npm install for $name (first run)..."
         ( cd "$dir" && npm install --silent ) 2>/dev/null
     fi
     info "Starting $name on :$port..."
@@ -266,56 +323,84 @@ start_ui() {
     PIDS+=($!)
 }
 
-start_ui "router-ui"               "$ROOT/agent/router/ui"                  3002
-start_ui "swiss-army-knife-monitor" "$ROOT/agent/swiss-army-knife/monitor"  3003
-start_ui "thinker-monitor"         "$ROOT/agent/thinker/monitor"            3006
-start_ui "memory-monitor"          "$ROOT/agent/memory/monitor"             3001
+if [[ "$UI_MODE" == "web" ]]; then
+    start_next_ui "router-ui"               "$ROOT/agent/router/ui"               3002
+    start_next_ui "swiss-army-knife-monitor" "$ROOT/agent/swiss-army-knife/monitor" 3003
+    start_next_ui "thinker-monitor"         "$ROOT/agent/thinker/monitor"          3006
+    start_next_ui "memory-monitor"          "$ROOT/agent/memory/monitor"           3001
 
-# Desktop app (Electron + Vite — opens a native window)
-info "Starting desktop app..."
-DIR="$ROOT/desktop"
-if [ ! -d "$DIR/node_modules" ]; then
-    info "  npm install for desktop (first run, may take a while)..."
-    ( cd "$DIR" && npm install --silent ) 2>/dev/null
+    echo ""
+    info "Waiting for Next.js UIs (may take ~10s on first start)..."
+    wait_for_port "router-ui"           3002 60
+    wait_for_port "swiss-knife-monitor" 3003 60
+    wait_for_port "thinker-monitor"     3006 60
+    wait_for_port "memory-monitor"      3001 60
+
+elif [[ "$UI_MODE" == "desktop" ]]; then
+    DIR="$ROOT/desktop"
+    if [ ! -d "$DIR/node_modules" ]; then
+        info "  npm install for desktop (first run)..."
+        ( cd "$DIR" && npm install --silent ) 2>/dev/null
+    fi
+    info "Starting Electron desktop app..."
+    ( cd "$DIR" && npm run dev ) \
+        > "$LOG_DIR/desktop.log" 2>&1 &
+    PIDS+=($!)
+    ok "Desktop app launching (Electron window will open shortly)"
+
+elif [[ "$UI_MODE" == "cli" ]]; then
+    # Ensure CLI deps are installed
+    CLI_DIR="$ROOT/cli"
+    if [ ! -d "$CLI_DIR/node_modules" ]; then
+        info "  bun install for cli (first run)..."
+        ( cd "$CLI_DIR" && "$BUN_BIN" install --silent ) 2>/dev/null
+    fi
+    ok "CLI deps ready"
 fi
-( cd "$DIR" && npm run dev ) \
-    > "$LOG_DIR/desktop.log" 2>&1 &
-PIDS+=($!)
-
-echo ""
-info "Waiting for UIs (Next.js takes ~10s on first start)..."
-wait_for_port "router-ui"               3002 60
-wait_for_port "swiss-knife-monitor"     3003 60
-wait_for_port "thinker-monitor"         3006 60
-wait_for_port "memory-monitor"          3001 60
 
 # =============================================================================
-#  DONE
+#  DONE BANNER
 # =============================================================================
 echo ""
 echo -e "${BOLD}${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}  ✓  Jarvis is running locally on macOS${NC}"
+echo -e "${BOLD}  ✓  Jarvis backend running  [--ui $UI_MODE]${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e ""
-echo -e "  ${BOLD}Desktop App${NC}          ${CYAN}(Electron window)${NC}"
-echo -e "  ${BOLD}Chat UI${NC}              ${CYAN}http://localhost:3002${NC}"
-echo -e "  ${BOLD}Router API${NC}           ${CYAN}http://localhost:8888${NC}"
-echo -e "  ${BOLD}Face API${NC}             ${CYAN}http://localhost:8400${NC}"
-echo -e "  ${BOLD}Vision${NC}               ${CYAN}http://localhost:8500${NC}"
-echo -e "  ${BOLD}Swiss-knife${NC}          ${CYAN}http://localhost:8787${NC}  ${YELLOW}(running as sudo)${NC}"
-echo -e "  ${BOLD}SAK Monitor${NC}          ${CYAN}http://localhost:3003${NC}"
-echo -e "  ${BOLD}Thinker${NC}              ${CYAN}http://localhost:8585${NC}"
-echo -e "  ${BOLD}Thinker Monitor${NC}      ${CYAN}http://localhost:3006${NC}"
-echo -e "  ${BOLD}Memory${NC}               ${CYAN}http://localhost:8686${NC}"
-echo -e "  ${BOLD}Memory Monitor${NC}       ${CYAN}http://localhost:3001${NC}"
-echo -e "  ${BOLD}Web Fetcher${NC}          ${CYAN}http://localhost:8099${NC}"
-echo -e "  ${BOLD}Kafka${NC}                ${CYAN}localhost:9094${NC}"
-echo -e "  ${BOLD}MinIO Console${NC}        ${CYAN}http://localhost:9001${NC}"
-echo -e ""
-echo -e "  Logs: ${YELLOW}./logs/<service>.log${NC}"
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "  Press ${BOLD}Ctrl+C${NC} to stop everything"
 echo ""
 
-# Keep alive until Ctrl+C
-wait
+if [[ "$UI_MODE" == "web" ]]; then
+    echo -e "  ${BOLD}Chat UI${NC}              ${CYAN}http://localhost:3002${NC}"
+    echo -e "  ${BOLD}SAK Monitor${NC}          ${CYAN}http://localhost:3003${NC}"
+    echo -e "  ${BOLD}Thinker Monitor${NC}      ${CYAN}http://localhost:3006${NC}"
+    echo -e "  ${BOLD}Memory Monitor${NC}       ${CYAN}http://localhost:3001${NC}"
+    echo ""
+elif [[ "$UI_MODE" == "desktop" ]]; then
+    echo -e "  ${BOLD}Desktop App${NC}          ${CYAN}(Electron window)${NC}"
+    echo ""
+elif [[ "$UI_MODE" == "cli" ]]; then
+    echo -e "  ${BOLD}CLI${NC}  Launching Jarvis terminal..."
+    echo ""
+fi
+
+echo -e "  ${BOLD}Router API${NC}           ${CYAN}http://localhost:8888${NC}"
+echo -e "  ${BOLD}Swiss-knife${NC}          ${CYAN}http://localhost:8787${NC}  ${YELLOW}(sudo)${NC}"
+echo -e "  ${BOLD}Thinker${NC}              ${CYAN}http://localhost:8585${NC}"
+echo -e "  ${BOLD}Memory${NC}               ${CYAN}http://localhost:8686${NC}"
+echo -e "  ${BOLD}Web Fetcher${NC}          ${CYAN}http://localhost:8099${NC}"
+echo -e "  ${BOLD}Face API${NC}             ${CYAN}http://localhost:8400${NC}"
+echo -e "  ${BOLD}Vision${NC}               ${CYAN}http://localhost:8500${NC}"
+echo -e "  ${BOLD}Kafka${NC}                ${CYAN}localhost:9094${NC}"
+echo -e "  ${BOLD}MinIO Console${NC}        ${CYAN}http://localhost:9001${NC}"
+echo ""
+echo -e "  Logs: ${YELLOW}./logs/<service>.log${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+if [[ "$UI_MODE" == "cli" ]]; then
+    # Hand the terminal over to the CLI — blocks until user exits
+    echo -e "  Press ${BOLD}Ctrl+C${NC} or type ${BOLD}/exit${NC} inside Jarvis to stop everything"
+    echo ""
+    "$BUN_BIN" "$ROOT/cli/src/main.tsx"
+else
+    echo -e "  Press ${BOLD}Ctrl+C${NC} to stop everything"
+    echo ""
+    wait
+fi
