@@ -168,6 +168,22 @@ def generate_response(state: RouterGraphState) -> Dict[str, Any]:
             header = f"**{title}** ({url})\n\n" if title else f"**{url}**\n\n"
             return {"response": header + content[:3000]}
 
+    # For code analysis: pass through the agent's formatted response directly
+    ca_result = tool_results.get("code_analyzer", {})
+    if intent == "code_analysis" and ca_result:
+        if ca_result.get("error"):
+            return {"response": f"Code analysis failed: {ca_result['error']}"}
+        if ca_result.get("response"):
+            sub_tools = ca_result.get("tools_used", [])
+            current_tools = state.get("tools_used", [])
+            merged_tools = current_tools + [t for t in sub_tools if t not in current_tools]
+            return {
+                "response": ca_result["response"],
+                "tools_used": merged_tools,
+                "findings": ca_result.get("findings", []),
+                "report": ca_result.get("report", {}),
+            }
+
     # For security tool: pass through completed response or return async status
     sk_result = tool_results.get("swiss_knife", {})
     if intent == "security" and sk_result:

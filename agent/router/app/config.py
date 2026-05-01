@@ -25,6 +25,7 @@ class RouterConfig:
     MEMORY_BASE_URL = os.getenv("MEMORY_BASE_URL", "http://localhost:8686")
     SWISS_KNIFE_BASE_URL = os.getenv("SWISS_KNIFE_BASE_URL", "http://localhost:8789")
     VISION_BASE_URL = os.getenv("VISION_BASE_URL", "http://localhost:8500")
+    CODE_ANALYZER_BASE_URL = os.getenv("CODE_ANALYZER_BASE_URL", "http://localhost:8900")
 
     # Security notification channels
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")

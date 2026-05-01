@@ -6,11 +6,17 @@ const api = {
   restoreWindow: (): void => ipcRenderer.send('restore-window'),
   activateGuard: (): void => ipcRenderer.send('guard-activate'),
   deactivateGuard: (): void => ipcRenderer.send('guard-deactivate'),
+  relockGuard: (): void => ipcRenderer.send('guard-relock'),
   showPinEntry: (): void => ipcRenderer.send('guard-show-pin'),
   onGuardCombo: (callback: () => void): (() => void) => {
     const handler = (): void => callback()
     ipcRenderer.on('guard-combo-matched', handler)
     return () => ipcRenderer.removeListener('guard-combo-matched', handler)
+  },
+  onGuardAlarm: (callback: () => void): (() => void) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('guard-alarm', handler)
+    return () => ipcRenderer.removeListener('guard-alarm', handler)
   },
   biometricAvailable: (): Promise<boolean> => ipcRenderer.invoke('biometric-available'),
   biometricVerify: (reason: string): Promise<boolean> => ipcRenderer.invoke('biometric-verify', reason),

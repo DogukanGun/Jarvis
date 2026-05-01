@@ -5,6 +5,17 @@ import { useWebSocket } from '../hooks/useWebSocket'
 
 type GuardStatus = 'watching' | 'pin-entry' | 'verifying' | 'verified' | 'alert'
 
+const windowApi = (window as unknown as { api?: {
+  minimizeWindow?: () => void
+  restoreWindow?: () => void
+  activateGuard?: () => void
+  deactivateGuard?: () => void
+  relockGuard?: () => void
+  showPinEntry?: () => void
+  onGuardCombo?: (cb: () => void) => () => void
+  onGuardAlarm?: (cb: () => void) => () => void
+} }).api
+
 const PIN_KEY = 'jarvis_guard_pin'
 
 const STATUS_LABEL: Record<GuardStatus, string> = {
@@ -15,24 +26,18 @@ const STATUS_LABEL: Record<GuardStatus, string> = {
   alert: 'INTRUDER DETECTED',
 }
 
-const windowApi = (window as unknown as { api?: {
-  minimizeWindow?: () => void
-  restoreWindow?: () => void
-  activateGuard?: () => void
-  deactivateGuard?: () => void
-  showPinEntry?: () => void
-  onGuardCombo?: (cb: () => void) => () => void
-} }).api
+let _alarmCtx: AudioContext | null = null
 
 function playAlarm(): void {
+  stopAlarm()
   const ctx = new AudioContext()
+  _alarmCtx = ctx
   const osc = ctx.createOscillator()
   const gain = ctx.createGain()
   osc.connect(gain)
   gain.connect(ctx.destination)
   osc.type = 'sawtooth'
   gain.gain.setValueAtTime(1.0, ctx.currentTime)
-
   let t = ctx.currentTime
   for (let i = 0; i < 20; i++) {
     osc.frequency.setValueAtTime(i % 2 === 0 ? 880 : 440, t)
@@ -40,7 +45,14 @@ function playAlarm(): void {
   }
   osc.start(ctx.currentTime)
   osc.stop(ctx.currentTime + 10)
-  osc.onended = () => ctx.close()
+  osc.onended = () => { ctx.close(); if (_alarmCtx === ctx) _alarmCtx = null }
+}
+
+function stopAlarm(): void {
+  if (_alarmCtx) {
+    _alarmCtx.close().catch(() => {})
+    _alarmCtx = null
+  }
 }
 
 export default function GuardMode({
@@ -50,17 +62,17 @@ export default function GuardMode({
 }): React.JSX.Element {
   const [guardStatus, setGuardStatus] = useState<GuardStatus>('watching')
   const [intruderPhoto, setIntruderPhoto] = useState<string | null>(null)
+  const [intruderVideoUrl, setIntruderVideoUrl] = useState<string | null>(null)
   const [isAlarming, setIsAlarming] = useState(false)
   const [resetKey, setResetKey] = useState(0)
   const [pinInput, setPinInput] = useState('')
   const [pinError, setPinError] = useState('')
   const [pendingFrame, setPendingFrame] = useState<string | null>(null)
-  const [countdown, setCountdown] = useState(0)
-  const personDetectedRef = useRef(false)
 
-  const { videoRef, ready, capture } = useCamera()
+  const { videoRef, ready, capture, startRecording, stopRecording } = useCamera()
   const loopCancelRef = useRef(false)
 
+  // Remote alarm from WebSocket (e.g. another device)
   const onAlarm = useCallback(() => {
     setIsAlarming(true)
     playAlarm()
@@ -69,12 +81,39 @@ export default function GuardMode({
 
   useWebSocket({ onAlarm })
 
-  // Activate overlay + minimize on mount
+  // Alarm from overlay (mouse move / click / timeout) → record video + go to PIN entry
+  useEffect(() => {
+    if (guardStatus !== 'watching') return
+    const cleanup = windowApi?.onGuardAlarm?.(() => {
+      const frame = capture() ?? pendingFrame
+      playAlarm()
+      setIsAlarming(true)
+      setTimeout(() => setIsAlarming(false), 10_000)
+      setPendingFrame(frame)
+      startRecording()  // start capturing the intruder
+      if (frame) {
+        fetch('http://localhost:8888/api/security/alert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image_b64: frame,
+            message: `Motion detected at ${new Date().toLocaleString()}`,
+          }),
+        }).catch(() => {})
+      }
+      setGuardStatus('pin-entry')
+      setPinInput('')
+      setPinError('')
+    })
+    return () => cleanup?.()
+  }, [guardStatus]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Activate overlay on mount
   useEffect(() => {
     windowApi?.activateGuard?.()
   }, [])
 
-  // YOLO detection loop — tracks if a person is present, does NOT show PIN
+  // YOLO detection loop
   useEffect(() => {
     if (!ready) return
     if (guardStatus !== 'watching') return
@@ -84,13 +123,8 @@ export default function GuardMode({
 
     async function loop(): Promise<void> {
       if (loopCancelRef.current) return
-
       const frame = capture()
-      if (!frame) {
-        timeoutId = setTimeout(loop, 3000)
-        return
-      }
-
+      if (!frame) { timeoutId = setTimeout(loop, 3000); return }
       try {
         const res = await fetch('http://localhost:8500/api/detect', {
           method: 'POST',
@@ -98,38 +132,25 @@ export default function GuardMode({
           body: JSON.stringify({ image_b64: frame, confidence_threshold: 0.5 }),
         })
         const data = (await res.json()) as { objects?: { label: string }[] }
-        personDetectedRef.current = data.objects?.some((o) => o.label === 'person') ?? false
-        if (personDetectedRef.current) {
+        if (data.objects?.some((o) => o.label === 'person')) {
           setPendingFrame(frame)
         }
-      } catch {
-        // Vision service unavailable
-      }
-
-      if (!loopCancelRef.current) {
-        timeoutId = setTimeout(loop, 3000)
-      }
+      } catch { /* vision unavailable */ }
+      if (!loopCancelRef.current) timeoutId = setTimeout(loop, 3000)
     }
 
     timeoutId = setTimeout(loop, 500)
-
-    return () => {
-      loopCancelRef.current = true
-      clearTimeout(timeoutId)
-    }
+    return () => { loopCancelRef.current = true; clearTimeout(timeoutId) }
   }, [ready, resetKey, guardStatus]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Listen for unlock combo (Shift Shift Enter Enter) from overlay
+  // X key from overlay → PIN entry (owner intentionally unlocking)
   useEffect(() => {
     if (guardStatus !== 'watching') return
-
     const cleanup = windowApi?.onGuardCombo?.(() => {
-      // Combo entered — show PIN entry
       setGuardStatus('pin-entry')
       setPinInput('')
       setPinError('')
     })
-
     return () => cleanup?.()
   }, [guardStatus])
 
@@ -137,9 +158,9 @@ export default function GuardMode({
     const savedPin = localStorage.getItem(PIN_KEY)
     if (pinInput !== savedPin) {
       setPinError('Wrong PIN')
+      setPinInput('')
       return
     }
-
     setPinError('')
     setGuardStatus('verifying')
     runBiometricVerification()
@@ -148,51 +169,38 @@ export default function GuardMode({
   const runBiometricVerification = async () => {
     try {
       const ok = await verifyBiometric()
-
       if (ok) {
+        stopAlarm()
+        setIsAlarming(false)
+        // Stop recording and store the clip — show it in the verified screen
+        const videoUrl = await stopRecording()
+        if (videoUrl) setIntruderVideoUrl(videoUrl)
         setGuardStatus('verified')
-        setTimeout(() => {
-          windowApi?.deactivateGuard?.()
-          onDeactivate()
-        }, 1000)
+        // No auto-dismiss — owner watches the clip then clicks Return to Chat
       } else {
+        // Biometric failed — capture intruder photo and lock into alert
         const frame = capture() ?? pendingFrame
-        setGuardStatus('alert')
         setIntruderPhoto(frame)
-        triggerAlarm(frame)
+        setGuardStatus('alert')
+        playAlarm()
+        setIsAlarming(true)
+        setTimeout(() => setIsAlarming(false), 10_000)
+        if (frame) {
+          fetch('http://localhost:8888/api/security/alert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image_b64: frame,
+              message: `Biometric verification failed at ${new Date().toLocaleString()}`,
+            }),
+          }).catch(() => {})
+        }
       }
     } catch {
-      setGuardStatus('watching')
-      windowApi?.minimizeWindow?.()
+      // Biometric unavailable — fall back to PIN-only, stay on pin-entry
+      setGuardStatus('pin-entry')
+      setPinError('')
     }
-  }
-
-  function triggerAlarm(frame: string | null): void {
-    playAlarm()
-    setIsAlarming(true)
-    setTimeout(() => setIsAlarming(false), 10_000)
-
-    if (frame) {
-      fetch('http://localhost:8888/api/security/alert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image_b64: frame,
-          message: `Intruder detected at ${new Date().toLocaleString()}`,
-        }),
-      }).catch(() => {})
-    }
-  }
-
-  function handleReset(): void {
-    setGuardStatus('watching')
-    setIntruderPhoto(null)
-    setIsAlarming(false)
-    setPinInput('')
-    setPinError('')
-    setPendingFrame(null)
-    setResetKey((k) => k + 1)
-    windowApi?.activateGuard?.()
   }
 
   function handleDeactivate(): void {
@@ -204,11 +212,10 @@ export default function GuardMode({
     <div className="guard-page">
       <div className="guard-status-bar">
         <span className={`guard-status-indicator ${guardStatus}`}>
-          {guardStatus === 'verifying' && countdown > 0
-            ? `preparing verification... ${countdown}`
-            : STATUS_LABEL[guardStatus]}
+          {STATUS_LABEL[guardStatus]}
         </span>
-        {guardStatus !== 'alert' && (
+        {/* Only show Return to Chat when actively watching (owner's escape) */}
+        {guardStatus === 'watching' && (
           <button className="guard-deactivate-btn" onClick={handleDeactivate}>
             Return to Chat
           </button>
@@ -222,7 +229,7 @@ export default function GuardMode({
         {isAlarming && <div className="alarm-overlay" />}
       </div>
 
-      {/* PIN Entry Panel */}
+      {/* PIN Entry — shown for both owner (X key) and intruder (alarm triggered) */}
       {guardStatus === 'pin-entry' && (
         <div className="guard-pin-panel">
           <p className="guard-pin-title">ENTER PIN</p>
@@ -242,7 +249,33 @@ export default function GuardMode({
         </div>
       )}
 
-      {/* Alert Panel */}
+      {/* Verified — show recorded intruder clip then let owner return to chat */}
+      {guardStatus === 'verified' && (
+        <div className="guard-alert-panel">
+          <p className="guard-alert-title" style={{ color: '#4ade80' }}>IDENTITY CONFIRMED</p>
+          {intruderVideoUrl ? (
+            // eslint-disable-next-line jsx-a11y/media-has-caption
+            <video
+              src={intruderVideoUrl}
+              className="guard-intruder-photo"
+              controls
+              autoPlay
+              loop
+            />
+          ) : intruderPhoto ? (
+            <img
+              src={`data:image/jpeg;base64,${intruderPhoto}`}
+              className="guard-intruder-photo"
+              alt="Intruder snapshot"
+            />
+          ) : null}
+          <button className="guard-activate-btn" onClick={handleDeactivate}>
+            Return to Chat
+          </button>
+        </div>
+      )}
+
+      {/* Alert — shown only after biometric failure. Dead end: no reset button. */}
       {guardStatus === 'alert' && (
         <div className="guard-alert-panel">
           <p className="guard-alert-title">INTRUDER DETECTED</p>
@@ -253,9 +286,6 @@ export default function GuardMode({
               alt="Intruder"
             />
           )}
-          <button className="guard-reset-btn" onClick={handleReset}>
-            Reset Watch
-          </button>
         </div>
       )}
     </div>

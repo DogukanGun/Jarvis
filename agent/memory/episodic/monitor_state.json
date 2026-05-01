@@ -3,15 +3,15 @@
     "status": "idle",
     "graphs": {
       "main_graph": {
-        "runs": 21,
+        "runs": 8,
         "errors": 0,
-        "last_run": "2026-04-01T11:15:57.425+00:00",
+        "last_run": "2026-05-01T11:44:21.490+00:00",
         "active_node": null
       },
       "memory_write_graph": {
-        "runs": 20,
+        "runs": 8,
         "errors": 0,
-        "last_run": "2026-04-01T11:16:33.624+00:00",
+        "last_run": "2026-05-01T11:44:21.509+00:00",
         "active_node": null
       },
       "reflection_graph": {
@@ -28,15 +28,15 @@
       }
     },
     "metrics": {
-      "total_episodes": 16,
+      "total_episodes": 8,
       "total_promotions": 0,
       "total_rejections": 0,
       "total_reflections": 0,
-      "total_searches": 21,
-      "avg_write_latency_ms": 84.6,
+      "total_searches": 8,
+      "avg_write_latency_ms": 8.2,
       "avg_search_latency_ms": 0,
-      "dedup_hit_count": 4,
-      "dedup_total_count": 4,
+      "dedup_hit_count": 0,
+      "dedup_total_count": 0,
       "secrets_redacted": 0
     },
     "services": {
@@ -69,546 +69,13 @@
   "events": [
     {
       "type": "graph_run_start",
-      "timestamp": "2026-03-28T22:50:19.780+00:00",
+      "timestamp": "2026-05-01T11:32:21.527+00:00",
       "graph": "main_graph",
-      "user_id": "default"
+      "user_id": "admin"
     },
     {
       "type": "search_executed",
-      "timestamp": "2026-03-28T22:50:19.798+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 2,
-      "sources": [
-        "sqlite"
-      ]
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T22:50:19.802+00:00",
-      "graph": "main_graph",
-      "duration_ms": 22
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T22:54:07.023+00:00",
-      "graph": "main_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-03-28T22:54:07.037+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 2,
-      "sources": [
-        "sqlite"
-      ]
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T22:54:40.565+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T22:54:40.566+00:00",
-      "graph": "main_graph",
-      "duration_ms": 33543
-    },
-    {
-      "type": "episode_inserted",
-      "timestamp": "2026-03-28T22:54:40.587+00:00",
-      "graph": "memory_write_graph",
-      "node": "insert_episode",
-      "episode_id": "38f4189a-bec8-4389-b30c-4b69b995b5ee",
-      "user_id": "default",
-      "episode_type": "interaction"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T22:54:40.610+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 42
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-03-28T22:54:40.610+00:00",
-      "latency_ms": 42
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T22:54:40.628+00:00",
-      "graph": "main_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-03-28T22:54:40.635+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 3,
-      "sources": [
-        "sqlite"
-      ]
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T22:54:57.010+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T22:54:57.011+00:00",
-      "graph": "main_graph",
-      "duration_ms": 16382
-    },
-    {
-      "type": "episode_deduplicated",
-      "timestamp": "2026-03-28T22:54:57.022+00:00",
-      "graph": "memory_write_graph",
-      "node": "dedupe_lookup",
-      "existing_episode_id": "38f4189a-bec8-4389-b30c-4b69b995b5ee",
-      "reinforcement_count": 1
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T22:54:57.033+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 19
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-03-28T22:54:57.033+00:00",
-      "latency_ms": 19
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T22:54:57.103+00:00",
-      "graph": "main_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-03-28T22:54:57.114+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 3,
-      "sources": [
-        "sqlite"
-      ]
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T22:55:27.189+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T22:55:27.190+00:00",
-      "graph": "main_graph",
-      "duration_ms": 30087
-    },
-    {
-      "type": "episode_inserted",
-      "timestamp": "2026-03-28T22:55:27.215+00:00",
-      "graph": "memory_write_graph",
-      "node": "insert_episode",
-      "episode_id": "0fd0b4f2-2410-4cab-acc6-ad7819495d85",
-      "user_id": "default",
-      "episode_type": "interaction"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T22:55:27.240+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 43
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-03-28T22:55:27.241+00:00",
-      "latency_ms": 43
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T22:55:54.035+00:00",
-      "graph": "main_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-03-28T22:55:54.071+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 3,
-      "sources": [
-        "sqlite"
-      ]
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T22:56:06.891+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T22:56:06.891+00:00",
-      "graph": "main_graph",
-      "duration_ms": 12851
-    },
-    {
-      "type": "episode_inserted",
-      "timestamp": "2026-03-28T22:56:06.900+00:00",
-      "graph": "memory_write_graph",
-      "node": "insert_episode",
-      "episode_id": "814a07d1-cc51-47a6-88fc-4ab7f2e0d70d",
-      "user_id": "default",
-      "episode_type": "interaction"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T22:56:06.905+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 13
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-03-28T22:56:06.906+00:00",
-      "latency_ms": 13
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T22:56:07.493+00:00",
-      "graph": "main_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-03-28T22:56:07.505+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 4,
-      "sources": [
-        "sqlite"
-      ]
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T22:56:22.379+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T22:56:22.380+00:00",
-      "graph": "main_graph",
-      "duration_ms": 14886
-    },
-    {
-      "type": "episode_inserted",
-      "timestamp": "2026-03-28T22:56:22.390+00:00",
-      "graph": "memory_write_graph",
-      "node": "insert_episode",
-      "episode_id": "3f577497-81b0-4e29-b098-01aff9d0f4ec",
-      "user_id": "default",
-      "episode_type": "interaction"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T22:56:22.399+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 16
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-03-28T22:56:22.399+00:00",
-      "latency_ms": 16
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T22:56:25.004+00:00",
-      "graph": "main_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-03-28T22:56:25.021+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 4,
-      "sources": [
-        "sqlite"
-      ]
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T22:56:51.991+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T22:56:51.992+00:00",
-      "graph": "main_graph",
-      "duration_ms": 26986
-    },
-    {
-      "type": "episode_inserted",
-      "timestamp": "2026-03-28T22:56:52.004+00:00",
-      "graph": "memory_write_graph",
-      "node": "insert_episode",
-      "episode_id": "a2d7091e-e908-4fec-af6f-6c9d13d24371",
-      "user_id": "default",
-      "episode_type": "interaction"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T22:56:52.013+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 19
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-03-28T22:56:52.013+00:00",
-      "latency_ms": 19
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T23:14:04.276+00:00",
-      "graph": "main_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-03-28T23:14:04.342+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 4,
-      "sources": [
-        "sqlite"
-      ]
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T23:14:44.021+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T23:14:44.022+00:00",
-      "graph": "main_graph",
-      "duration_ms": 39739
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T23:14:44.036+00:00",
-      "graph": "main_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "episode_inserted",
-      "timestamp": "2026-03-28T23:14:44.046+00:00",
-      "graph": "memory_write_graph",
-      "node": "insert_episode",
-      "episode_id": "0baba86d-d417-46cd-b295-eb3dd78d8f0e",
-      "user_id": "default",
-      "episode_type": "interaction"
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-03-28T23:14:44.049+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 4,
-      "sources": [
-        "sqlite"
-      ]
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T23:14:44.055+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 30
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-03-28T23:14:44.056+00:00",
-      "latency_ms": 30
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T23:15:16.185+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T23:15:16.187+00:00",
-      "graph": "main_graph",
-      "duration_ms": 32150
-    },
-    {
-      "type": "episode_deduplicated",
-      "timestamp": "2026-03-28T23:15:16.199+00:00",
-      "graph": "memory_write_graph",
-      "node": "dedupe_lookup",
-      "existing_episode_id": "0baba86d-d417-46cd-b295-eb3dd78d8f0e",
-      "reinforcement_count": 1
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T23:15:16.244+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 56
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T23:15:16.244+00:00",
-      "graph": "main_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-03-28T23:15:16.245+00:00",
-      "latency_ms": 56
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-03-28T23:15:16.253+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 0,
-      "sources": []
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-03-28T23:15:39.092+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "default"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T23:15:39.093+00:00",
-      "graph": "main_graph",
-      "duration_ms": 22848
-    },
-    {
-      "type": "episode_inserted",
-      "timestamp": "2026-03-28T23:15:39.108+00:00",
-      "graph": "memory_write_graph",
-      "node": "insert_episode",
-      "episode_id": "f7308780-5a4d-4e18-9047-abb6a60b41e0",
-      "user_id": "default",
-      "episode_type": "interaction"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-03-28T23:15:39.118+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 22
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-03-28T23:15:39.118+00:00",
-      "latency_ms": 22
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T08:45:00.727+00:00",
-      "graph": "main_graph",
-      "user_id": "jarvis-cli"
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-04-01T08:45:00.810+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 0,
-      "sources": []
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T08:46:17.167+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "jarvis-cli"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-04-01T08:46:17.169+00:00",
-      "graph": "main_graph",
-      "duration_ms": 76433
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T08:46:17.189+00:00",
-      "graph": "main_graph",
-      "user_id": "jarvis-cli"
-    },
-    {
-      "type": "episode_inserted",
-      "timestamp": "2026-04-01T08:46:17.200+00:00",
-      "graph": "memory_write_graph",
-      "node": "insert_episode",
-      "episode_id": "7602f564-d14c-496a-a491-bc3f6c858432",
-      "user_id": "jarvis-cli",
-      "episode_type": "interaction"
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-04-01T08:46:17.207+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 1,
-      "sources": [
-        "sqlite"
-      ]
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-04-01T08:46:17.229+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 54
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-04-01T08:46:17.230+00:00",
-      "latency_ms": 54
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T08:46:50.240+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "jarvis-cli"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-04-01T08:46:50.242+00:00",
-      "graph": "main_graph",
-      "duration_ms": 33052
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T08:46:50.257+00:00",
-      "graph": "main_graph",
-      "user_id": "jarvis-cli"
-    },
-    {
-      "type": "episode_inserted",
-      "timestamp": "2026-04-01T08:46:50.261+00:00",
-      "graph": "memory_write_graph",
-      "node": "insert_episode",
-      "episode_id": "7efc85c1-05af-4666-9400-79f5f1af511c",
-      "user_id": "jarvis-cli",
-      "episode_type": "interaction"
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-04-01T08:46:50.269+00:00",
+      "timestamp": "2026-05-01T11:32:21.589+00:00",
       "graph": "main_graph",
       "node": "retrieve_episodes",
       "result_count": 0,
@@ -616,151 +83,187 @@
     },
     {
       "type": "graph_run_end",
-      "timestamp": "2026-04-01T08:46:50.274+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 30
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-04-01T08:46:50.275+00:00",
-      "latency_ms": 30
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T08:48:10.633+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "jarvis-cli"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-04-01T08:48:10.635+00:00",
+      "timestamp": "2026-05-01T11:32:21.590+00:00",
       "graph": "main_graph",
-      "duration_ms": 80377
-    },
-    {
-      "type": "episode_inserted",
-      "timestamp": "2026-04-01T08:48:10.662+00:00",
-      "graph": "memory_write_graph",
-      "node": "insert_episode",
-      "episode_id": "a9d170fc-4770-4c26-b78c-9d2dcc51cc94",
-      "user_id": "jarvis-cli",
-      "episode_type": "interaction"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-04-01T08:48:10.883+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 240
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-04-01T08:48:10.884+00:00",
-      "latency_ms": 240
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T09:09:51.625+00:00",
-      "graph": "main_graph",
-      "user_id": "jarvis-cli"
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-04-01T09:09:51.733+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 2,
-      "sources": [
-        "sqlite"
-      ]
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T09:11:12.231+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "jarvis-cli"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-04-01T09:11:12.233+00:00",
-      "graph": "main_graph",
-      "duration_ms": 80598
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T09:11:12.266+00:00",
-      "graph": "main_graph",
-      "user_id": "jarvis-cli"
-    },
-    {
-      "type": "episode_deduplicated",
-      "timestamp": "2026-04-01T09:11:12.293+00:00",
-      "graph": "memory_write_graph",
-      "node": "dedupe_lookup",
-      "existing_episode_id": "7efc85c1-05af-4666-9400-79f5f1af511c",
-      "reinforcement_count": 1
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-04-01T09:11:12.350+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 1,
-      "sources": [
-        "sqlite"
-      ]
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-04-01T09:11:12.368+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 132
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-04-01T09:11:12.368+00:00",
-      "latency_ms": 132
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T09:11:40.966+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "jarvis-cli"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-04-01T09:11:40.967+00:00",
-      "graph": "main_graph",
-      "duration_ms": 28698
-    },
-    {
-      "type": "episode_inserted",
-      "timestamp": "2026-04-01T09:11:40.995+00:00",
-      "graph": "memory_write_graph",
-      "node": "insert_episode",
-      "episode_id": "1899d517-3b6e-4c82-b6f1-38a014efec0a",
-      "user_id": "jarvis-cli",
-      "episode_type": "interaction"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-04-01T09:11:41.032+00:00",
-      "graph": "memory_write_graph",
       "duration_ms": 62
     },
     {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-01T11:32:21.604+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-01T11:32:21.606+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "da154662-6d0c-4e17-abd9-6495ed5aef49",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-01T11:32:21.624+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 19
+    },
+    {
       "type": "write_completed",
-      "timestamp": "2026-04-01T09:11:41.033+00:00",
-      "latency_ms": 62
+      "timestamp": "2026-05-01T11:32:21.624+00:00",
+      "latency_ms": 19
     },
     {
       "type": "graph_run_start",
-      "timestamp": "2026-04-01T09:26:07.154+00:00",
+      "timestamp": "2026-05-01T11:32:22.893+00:00",
       "graph": "main_graph",
-      "user_id": "jarvis-cli"
+      "user_id": "admin"
     },
     {
       "type": "search_executed",
-      "timestamp": "2026-04-01T09:26:07.223+00:00",
+      "timestamp": "2026-05-01T11:32:22.907+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 0,
+      "sources": []
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-01T11:32:22.908+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-01T11:32:22.908+00:00",
+      "graph": "main_graph",
+      "duration_ms": 15
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-01T11:32:22.912+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "4cdcbf24-7b07-46e3-b447-5f17ecbf833c",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-01T11:32:22.915+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 6
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-01T11:32:22.915+00:00",
+      "latency_ms": 6
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-01T11:34:46.952+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-01T11:34:46.973+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 1,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-01T11:34:46.974+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-01T11:34:46.974+00:00",
+      "graph": "main_graph",
+      "duration_ms": 21
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-01T11:34:46.977+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "4c068501-888c-4797-8790-e98c868e7160",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-01T11:34:46.985+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 10
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-01T11:34:46.985+00:00",
+      "latency_ms": 10
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-01T11:34:49.136+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-01T11:34:49.153+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 1,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-01T11:34:49.156+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-01T11:34:49.156+00:00",
+      "graph": "main_graph",
+      "duration_ms": 20
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-01T11:34:49.158+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "e4fd4482-a6d8-4360-ae4a-8e1ce34c5d2d",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-01T11:34:49.161+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 4
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-01T11:34:49.161+00:00",
+      "latency_ms": 4
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-01T11:44:13.432+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-01T11:44:13.450+00:00",
       "graph": "main_graph",
       "node": "retrieve_episodes",
       "result_count": 2,
@@ -770,34 +273,45 @@
     },
     {
       "type": "graph_run_start",
-      "timestamp": "2026-04-01T09:28:07.692+00:00",
+      "timestamp": "2026-05-01T11:44:13.451+00:00",
       "graph": "memory_write_graph",
-      "user_id": "jarvis-cli"
+      "user_id": "admin"
     },
     {
       "type": "graph_run_end",
-      "timestamp": "2026-04-01T09:28:07.740+00:00",
+      "timestamp": "2026-05-01T11:44:13.452+00:00",
       "graph": "main_graph",
-      "duration_ms": 120557
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T09:28:07.893+00:00",
-      "graph": "main_graph",
-      "user_id": "jarvis-cli"
+      "duration_ms": 18
     },
     {
       "type": "episode_inserted",
-      "timestamp": "2026-04-01T09:28:07.969+00:00",
+      "timestamp": "2026-05-01T11:44:13.455+00:00",
       "graph": "memory_write_graph",
       "node": "insert_episode",
-      "episode_id": "a8d589b8-c471-4f43-a3ad-d889d088da51",
-      "user_id": "jarvis-cli",
+      "episode_id": "0ba3738b-1dd0-4122-85a7-a5cbcbca2329",
+      "user_id": "admin",
       "episode_type": "interaction"
     },
     {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-01T11:44:13.463+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 10
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-01T11:44:13.463+00:00",
+      "latency_ms": 10
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-01T11:44:16.051+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
       "type": "search_executed",
-      "timestamp": "2026-04-01T09:28:08.021+00:00",
+      "timestamp": "2026-05-01T11:44:16.071+00:00",
       "graph": "main_graph",
       "node": "retrieve_episodes",
       "result_count": 2,
@@ -806,57 +320,46 @@
       ]
     },
     {
-      "type": "graph_run_end",
-      "timestamp": "2026-04-01T09:28:08.294+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 546
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-04-01T09:28:08.294+00:00",
-      "latency_ms": 546
-    },
-    {
       "type": "graph_run_start",
-      "timestamp": "2026-04-01T09:29:59.223+00:00",
+      "timestamp": "2026-05-01T11:44:16.072+00:00",
       "graph": "memory_write_graph",
-      "user_id": "jarvis-cli"
+      "user_id": "admin"
     },
     {
       "type": "graph_run_end",
-      "timestamp": "2026-04-01T09:29:59.230+00:00",
+      "timestamp": "2026-05-01T11:44:16.072+00:00",
       "graph": "main_graph",
-      "duration_ms": 111337
+      "duration_ms": 20
     },
     {
       "type": "episode_inserted",
-      "timestamp": "2026-04-01T09:29:59.426+00:00",
+      "timestamp": "2026-05-01T11:44:16.076+00:00",
       "graph": "memory_write_graph",
       "node": "insert_episode",
-      "episode_id": "e2396346-6433-4d42-b008-620336f29d23",
-      "user_id": "jarvis-cli",
+      "episode_id": "cf543165-aab8-43bf-a8a2-9d0dfeb56d55",
+      "user_id": "admin",
       "episode_type": "interaction"
     },
     {
       "type": "graph_run_end",
-      "timestamp": "2026-04-01T09:29:59.508+00:00",
+      "timestamp": "2026-05-01T11:44:16.079+00:00",
       "graph": "memory_write_graph",
-      "duration_ms": 218
+      "duration_ms": 6
     },
     {
       "type": "write_completed",
-      "timestamp": "2026-04-01T09:29:59.508+00:00",
-      "latency_ms": 218
+      "timestamp": "2026-05-01T11:44:16.080+00:00",
+      "latency_ms": 6
     },
     {
       "type": "graph_run_start",
-      "timestamp": "2026-04-01T09:49:42.717+00:00",
+      "timestamp": "2026-05-01T11:44:20.484+00:00",
       "graph": "main_graph",
-      "user_id": "jarvis-cli"
+      "user_id": "admin"
     },
     {
       "type": "search_executed",
-      "timestamp": "2026-04-01T09:49:42.859+00:00",
+      "timestamp": "2026-05-01T11:44:20.502+00:00",
       "graph": "main_graph",
       "node": "retrieve_episodes",
       "result_count": 3,
@@ -866,92 +369,45 @@
     },
     {
       "type": "graph_run_start",
-      "timestamp": "2026-04-01T09:50:07.304+00:00",
+      "timestamp": "2026-05-01T11:44:20.504+00:00",
       "graph": "memory_write_graph",
-      "user_id": "jarvis-cli"
+      "user_id": "admin"
     },
     {
       "type": "graph_run_end",
-      "timestamp": "2026-04-01T09:50:07.306+00:00",
+      "timestamp": "2026-05-01T11:44:20.504+00:00",
       "graph": "main_graph",
-      "duration_ms": 24575
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T09:50:07.324+00:00",
-      "graph": "main_graph",
-      "user_id": "jarvis-cli"
-    },
-    {
-      "type": "episode_deduplicated",
-      "timestamp": "2026-04-01T09:50:07.335+00:00",
-      "graph": "memory_write_graph",
-      "node": "dedupe_lookup",
-      "existing_episode_id": "7602f564-d14c-496a-a491-bc3f6c858432",
-      "reinforcement_count": 1
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-04-01T09:50:07.341+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 3,
-      "sources": [
-        "sqlite"
-      ]
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-04-01T09:50:07.351+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 37
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-04-01T09:50:07.351+00:00",
-      "latency_ms": 37
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T09:50:40.835+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "jarvis-cli"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-04-01T09:50:40.835+00:00",
-      "graph": "main_graph",
-      "duration_ms": 33511
+      "duration_ms": 19
     },
     {
       "type": "episode_inserted",
-      "timestamp": "2026-04-01T09:50:40.844+00:00",
+      "timestamp": "2026-05-01T11:44:20.506+00:00",
       "graph": "memory_write_graph",
       "node": "insert_episode",
-      "episode_id": "a6e375e3-fadf-4e7e-869e-fd7a08d850e9",
-      "user_id": "jarvis-cli",
+      "episode_id": "dbab44d0-fd56-4be0-acdd-760f3aecce62",
+      "user_id": "admin",
       "episode_type": "interaction"
     },
     {
       "type": "graph_run_end",
-      "timestamp": "2026-04-01T09:50:40.898+00:00",
+      "timestamp": "2026-05-01T11:44:20.509+00:00",
       "graph": "memory_write_graph",
-      "duration_ms": 61
+      "duration_ms": 5
     },
     {
       "type": "write_completed",
-      "timestamp": "2026-04-01T09:50:40.898+00:00",
-      "latency_ms": 61
+      "timestamp": "2026-05-01T11:44:20.510+00:00",
+      "latency_ms": 5
     },
     {
       "type": "graph_run_start",
-      "timestamp": "2026-04-01T11:14:54.901+00:00",
+      "timestamp": "2026-05-01T11:44:21.490+00:00",
       "graph": "main_graph",
-      "user_id": "jarvis-cli"
+      "user_id": "admin"
     },
     {
       "type": "search_executed",
-      "timestamp": "2026-04-01T11:14:55.018+00:00",
+      "timestamp": "2026-05-01T11:44:21.508+00:00",
       "graph": "main_graph",
       "node": "retrieve_episodes",
       "result_count": 3,
@@ -961,84 +417,36 @@
     },
     {
       "type": "graph_run_start",
-      "timestamp": "2026-04-01T11:15:57.409+00:00",
+      "timestamp": "2026-05-01T11:44:21.509+00:00",
       "graph": "memory_write_graph",
-      "user_id": "jarvis-cli"
+      "user_id": "admin"
     },
     {
       "type": "graph_run_end",
-      "timestamp": "2026-04-01T11:15:57.410+00:00",
+      "timestamp": "2026-05-01T11:44:21.509+00:00",
       "graph": "main_graph",
-      "duration_ms": 62500
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T11:15:57.425+00:00",
-      "graph": "main_graph",
-      "user_id": "jarvis-cli"
+      "duration_ms": 18
     },
     {
       "type": "episode_inserted",
-      "timestamp": "2026-04-01T11:15:57.434+00:00",
+      "timestamp": "2026-05-01T11:44:21.513+00:00",
       "graph": "memory_write_graph",
       "node": "insert_episode",
-      "episode_id": "0a285320-4a68-4829-8c19-f4531d60d6bc",
-      "user_id": "jarvis-cli",
-      "episode_type": "interaction"
-    },
-    {
-      "type": "search_executed",
-      "timestamp": "2026-04-01T11:15:57.442+00:00",
-      "graph": "main_graph",
-      "node": "retrieve_episodes",
-      "result_count": 4,
-      "sources": [
-        "sqlite"
-      ]
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-04-01T11:15:57.457+00:00",
-      "graph": "memory_write_graph",
-      "duration_ms": 40
-    },
-    {
-      "type": "write_completed",
-      "timestamp": "2026-04-01T11:15:57.457+00:00",
-      "latency_ms": 40
-    },
-    {
-      "type": "graph_run_start",
-      "timestamp": "2026-04-01T11:16:33.624+00:00",
-      "graph": "memory_write_graph",
-      "user_id": "jarvis-cli"
-    },
-    {
-      "type": "graph_run_end",
-      "timestamp": "2026-04-01T11:16:33.624+00:00",
-      "graph": "main_graph",
-      "duration_ms": 36198
-    },
-    {
-      "type": "episode_inserted",
-      "timestamp": "2026-04-01T11:16:33.631+00:00",
-      "graph": "memory_write_graph",
-      "node": "insert_episode",
-      "episode_id": "84fe34f5-f495-4a2b-84d0-d5ed3094b3ff",
-      "user_id": "jarvis-cli",
+      "episode_id": "3cfe7f2f-3c86-46b7-bc4e-7275b283ec06",
+      "user_id": "admin",
       "episode_type": "interaction"
     },
     {
       "type": "graph_run_end",
-      "timestamp": "2026-04-01T11:16:33.637+00:00",
+      "timestamp": "2026-05-01T11:44:21.516+00:00",
       "graph": "memory_write_graph",
-      "duration_ms": 12
+      "duration_ms": 6
     },
     {
       "type": "write_completed",
-      "timestamp": "2026-04-01T11:16:33.638+00:00",
-      "latency_ms": 12
+      "timestamp": "2026-05-01T11:44:21.516+00:00",
+      "latency_ms": 6
     }
   ],
-  "saved_at": "2026-04-01T11:16:33.638+00:00"
+  "saved_at": "2026-05-01T11:44:21.516+00:00"
 }

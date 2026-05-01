@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, systemPreferences, session } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, systemPreferences, session, globalShortcut, screen } from 'electron'
 import { join } from 'path'
 import { homedir } from 'os'
 import { readFileSync } from 'fs'
@@ -97,23 +97,69 @@ app.whenReady().then(async () => {
   })
 
   // Guard mode — fullscreen overlay to block input
-  let guardOverlay: BrowserWindow | null = null
+  let guardOverlays: BrowserWindow[] = []
 
-  ipcMain.on('guard-activate', () => {
-    const mainWin = BrowserWindow.getAllWindows().find((w) => w !== guardOverlay)
+  const GUARD_SHORTCUTS = [
+    'Cmd+Tab', 'Cmd+`', 'Cmd+Q', 'Cmd+H', 'Cmd+M', 'Cmd+W',
+    'Cmd+Space', 'Cmd+Option+Esc',
+    'F11', 'Control+Up', 'Control+Down', 'Control+Left', 'Control+Right',
+  ]
 
-    // Create overlay on each screen
-    if (!guardOverlay) {
-      const { screen } = require('electron')
-      const primaryDisplay = screen.getPrimaryDisplay()
-      const { width, height } = primaryDisplay.size
+  function registerGuardShortcuts(): void {
+    GUARD_SHORTCUTS.forEach((acc) => {
+      try { globalShortcut.register(acc, () => {}) } catch { /* ignore */ }
+    })
+  }
 
-      guardOverlay = new BrowserWindow({
+  function unregisterGuardShortcuts(): void {
+    GUARD_SHORTCUTS.forEach((acc) => {
+      try { globalShortcut.unregister(acc) } catch { /* ignore */ }
+    })
+  }
+
+  function findMainWindow(): BrowserWindow | undefined {
+    return BrowserWindow.getAllWindows().find((w) => !guardOverlays.includes(w))
+  }
+
+  function createGuardOverlays(): void {
+    const onUnlockPressed = (): void => {
+      const mainWin = findMainWindow()
+      if (!mainWin) return
+
+      guardOverlays.forEach((w) => { if (!w.isDestroyed()) w.hide() })
+      unregisterGuardShortcuts()
+      ipcMain.removeAllListeners('guard-overlay-unlock')
+
+      mainWin.webContents.send('guard-combo-matched')
+      mainWin.restore()
+      mainWin.show()
+      mainWin.setAlwaysOnTop(true, 'screen-saver')
+      mainWin.focus()
+    }
+
+    ipcMain.on('guard-overlay-unlock', onUnlockPressed)
+
+    const overlayHtml = `<!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8">
+      <style>
+        * { margin: 0; padding: 0; }
+        body { background: transparent; height: 100vh; overflow: hidden; cursor: default; }
+      </style>
+      </head>
+      <body></body>
+      </html>`
+
+    const preloadPath = join(__dirname, '../preload/guardOverlay.js')
+
+    for (const display of screen.getAllDisplays()) {
+      const { x, y, width, height } = display.bounds
+
+      const overlay = new BrowserWindow({
+        x,
+        y,
         width,
         height,
-        x: 0,
-        y: 0,
-        fullscreen: true,
         transparent: true,
         frame: false,
         alwaysOnTop: true,
@@ -121,47 +167,77 @@ app.whenReady().then(async () => {
         focusable: true,
         hasShadow: false,
         resizable: false,
-        webPreferences: { nodeIntegration: false },
+        movable: false,
+        minimizable: false,
+        closable: false,
+        fullscreenable: false,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          preload: preloadPath,
+        },
       })
-      guardOverlay.loadURL('data:text/html,<html><body style="margin:0;cursor:none;background:transparent;"></body></html>')
-      guardOverlay.setIgnoreMouseEvents(false)
-      guardOverlay.setAlwaysOnTop(true, 'screen-saver')
+      overlay.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(overlayHtml)}`)
+      overlay.setIgnoreMouseEvents(false)
+      overlay.setAlwaysOnTop(true, 'screen-saver')
+      overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
 
-      // Listen for unlock combo on the overlay: Shift Shift Enter Enter
-      const combo = ['Shift', 'Shift', 'Enter', 'Enter']
-      let seq: string[] = []
-      let comboTimer: ReturnType<typeof setTimeout> | null = null
-
-      guardOverlay.webContents.on('before-input-event', (_event, input) => {
-        if (input.type !== 'keyDown') return
-        seq.push(input.key)
-        if (comboTimer) clearTimeout(comboTimer)
-        comboTimer = setTimeout(() => { seq = [] }, 2000)
-
-        if (seq.length >= combo.length) {
-          const tail = seq.slice(-combo.length)
-          if (tail.every((k, i) => k === combo[i])) {
-            seq = []
-            // Notify renderer that combo was entered
-            const mainWin = BrowserWindow.getAllWindows().find((w) => w !== guardOverlay)
-            if (mainWin) {
-              mainWin.webContents.send('guard-combo-matched')
-              mainWin.restore()
-              mainWin.show()
-              mainWin.setAlwaysOnTop(true, 'screen-saver')
-              mainWin.focus()
-            }
-          }
-        }
-      })
+      guardOverlays.push(overlay)
     }
+  }
+
+  ipcMain.on('guard-alarm-triggered', () => {
+    const mainWin = findMainWindow()
+    if (!mainWin) return
+
+    // Hide overlays and bring main window forward — same as unlock, but sends alarm
+    guardOverlays.forEach((w) => { if (!w.isDestroyed()) w.hide() })
+    unregisterGuardShortcuts()
+    ipcMain.removeAllListeners('guard-overlay-unlock')
+
+    mainWin.restore()
+    mainWin.show()
+    mainWin.setAlwaysOnTop(true, 'screen-saver')
+    mainWin.focus()
+    mainWin.webContents.send('guard-alarm')
+  })
+
+  ipcMain.on('guard-activate', () => {
+    const mainWin = findMainWindow()
+
+    if (guardOverlays.length === 0) {
+      createGuardOverlays()
+    } else {
+      // Idempotent: re-show hidden overlays
+      guardOverlays.forEach((w) => { if (!w.isDestroyed() && !w.isVisible()) w.show() })
+    }
+
+    registerGuardShortcuts()
 
     // Minimize main window behind overlay
     if (mainWin) mainWin.minimize()
   })
 
+  // Re-lock: destroy old overlays and create fresh ones so the preload
+  // (and the 10s unlock timeout) restarts cleanly.
+  ipcMain.on('guard-relock', () => {
+    guardOverlays.forEach((w) => { if (!w.isDestroyed()) w.destroy() })
+    guardOverlays = []
+    ipcMain.removeAllListeners('guard-overlay-unlock')
+    createGuardOverlays()
+    registerGuardShortcuts()
+
+    const mainWin = findMainWindow()
+    if (mainWin) {
+      mainWin.setAlwaysOnTop(false)
+      mainWin.minimize()
+    }
+  })
+
   ipcMain.on('guard-show-pin', () => {
-    const mainWin = BrowserWindow.getAllWindows().find((w) => w !== guardOverlay)
+    const mainWin = findMainWindow()
+    guardOverlays.forEach((w) => { if (!w.isDestroyed()) w.hide() })
+    unregisterGuardShortcuts()
     if (mainWin) {
       mainWin.restore()
       mainWin.show()
@@ -171,10 +247,11 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.on('guard-deactivate', () => {
-    if (guardOverlay) {
-      guardOverlay.destroy()
-      guardOverlay = null
-    }
+    guardOverlays.forEach((w) => { if (!w.isDestroyed()) w.destroy() })
+    guardOverlays = []
+    unregisterGuardShortcuts()
+    ipcMain.removeAllListeners('guard-overlay-unlock')
+
     const mainWin = BrowserWindow.getAllWindows()[0]
     if (mainWin) {
       mainWin.setAlwaysOnTop(false)

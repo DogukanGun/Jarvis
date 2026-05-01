@@ -15,6 +15,7 @@ from .nodes import (
     invoke_thinker,
     invoke_web_fetcher,
     invoke_swiss_knife,
+    invoke_code_analyzer,
     generate_response,
     write_memory,
 )
@@ -33,6 +34,8 @@ def _intent_router(state: RouterGraphState) -> str:
         return "security"
     elif intent == "visual":
         return "visual"
+    elif intent == "code_analysis":
+        return "code_analysis"
     else:
         return "chat"
 
@@ -62,6 +65,7 @@ def create_router_graph():
     graph.add_node("invoke_thinker", invoke_thinker)
     graph.add_node("invoke_web_fetcher", invoke_web_fetcher)
     graph.add_node("invoke_swiss_knife", invoke_swiss_knife)
+    graph.add_node("invoke_code_analyzer", invoke_code_analyzer)
     graph.add_node("generate_response", generate_response)
     # write_memory is intentionally NOT in the graph — it is fired as a
     # background task in server.py after the WebSocket response is sent,
@@ -83,6 +87,7 @@ def create_router_graph():
             "research": "invoke_thinker",
             "web_fetch": "invoke_web_fetcher",
             "security": "invoke_swiss_knife",
+            "code_analysis": "invoke_code_analyzer",
         },
     )
 
@@ -90,6 +95,7 @@ def create_router_graph():
     graph.add_edge("invoke_thinker", "generate_response")
     graph.add_edge("invoke_web_fetcher", "generate_response")
     graph.add_edge("invoke_swiss_knife", "generate_response")
+    graph.add_edge("invoke_code_analyzer", "generate_response")
 
     # Response -> END (write_memory happens async in server.py)
     graph.add_edge("generate_response", END)

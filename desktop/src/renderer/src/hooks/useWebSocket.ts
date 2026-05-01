@@ -8,12 +8,32 @@ export interface WsResponse {
   emotion?: { emotion: string; valence: number; arousal: number; confidence: number }
 }
 
+export interface AgentEvent {
+  event_type: string      // "task.started" | "task.completed" | "task.failed" | "result.security_scan"
+  task_id?: string
+  sender?: string
+  target_agent?: string
+  thread_id?: string
+  timestamp?: string
+  // task.completed
+  response?: string
+  tools_used?: string[]
+  findings?: any[]
+  report?: Record<string, any>
+  // task.failed
+  error?: string
+  // result.security_scan
+  data?: Record<string, any>
+  success?: boolean
+}
+
 export interface UseWebSocketOptions {
   url?: string
   onStatus?: (text: string) => void
   onResponse?: (data: WsResponse) => void
   onError?: (text: string) => void
   onAlarm?: () => void
+  onAgentEvent?: (event: AgentEvent) => void
 }
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
@@ -25,6 +45,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     onResponse,
     onError,
     onAlarm,
+    onAgentEvent,
   } = options
 
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
@@ -34,8 +55,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const mountedRef = useRef(true)
 
   useEffect(() => {
-    callbacksRef.current = { onStatus, onResponse, onError, onAlarm }
-  }, [onStatus, onResponse, onError, onAlarm])
+    callbacksRef.current = { onStatus, onResponse, onError, onAlarm, onAgentEvent }
+  }, [onStatus, onResponse, onError, onAlarm, onAgentEvent])
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return
@@ -51,7 +72,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
-          const { onStatus, onResponse, onError, onAlarm } = callbacksRef.current
+          const { onStatus, onResponse, onError, onAlarm, onAgentEvent } = callbacksRef.current
           switch (data.type) {
             case 'status':
               onStatus?.(data.content ?? data.message ?? '')
@@ -66,14 +87,16 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
               onAlarm?.()
               break
             case 'agent_event': {
-              // Kafka-forwarded async results from sub-agents
+              // Forward full event to task-window handler first
+              onAgentEvent?.(data as AgentEvent)
+              // Also drive the existing status/response/error callbacks
               const evType = data.event_type ?? ''
               if (evType === 'task.completed' && data.response) {
                 onResponse?.({ content: data.response })
               } else if (evType === 'task.failed') {
                 onError?.(data.error ?? 'Task failed')
               } else if (evType === 'task.started') {
-                onStatus?.(`${data.target_agent ?? 'Agent'} working...`)
+                onStatus?.(`${data.sender ?? 'agent'} · task started`)
               }
               break
             }

@@ -165,6 +165,7 @@ export THINKER_BASE_URL="http://localhost:8585"
 export MEMORY_BASE_URL="http://localhost:8686"
 export WEB_FETCHER_BASE_URL="http://localhost:8099"
 export VISION_BASE_URL="http://localhost:8500"
+export CODE_ANALYZER_BASE_URL="http://localhost:8900"
 export NEXT_PUBLIC_ROUTER_URL="http://localhost:8888"
 
 # =============================================================================
@@ -269,7 +270,19 @@ info "Starting vision..."
     > "$LOG_DIR/vision.log" 2>&1 &
 PIDS+=($!)
 
-# 8. Swiss Army Knife (sudo for scapy raw sockets)
+# 8. Code Analyzer
+DIR="$ROOT/agent/code-analyzer"
+setup_venv "$DIR" "$DIR/requirements.txt"
+info "Starting code-analyzer..."
+( cd "$DIR" && AGENT_ID=code-analyzer PORT=8900 INDEXER_PORT=8901 \
+    CODE_ANALYZER_BASE_URL=http://localhost:8900 \
+    OPENAI_API_KEY="$OPENAI_API_KEY" LLM_PROVIDER=openai \
+    KAFKA_BROKERS=localhost:9094 \
+    "$DIR/.venv/bin/python" run_server.py ) \
+    > "$LOG_DIR/code-analyzer.log" 2>&1 &
+PIDS+=($!)
+
+# 9. Swiss Army Knife (sudo for scapy raw sockets)
 DIR="$ROOT/agent/swiss-army-knife"
 setup_venv "$DIR" "$DIR/requirements.txt"
 info "Starting swiss-army-knife ${YELLOW}(sudo required for scapy)${NC}..."
@@ -303,6 +316,7 @@ wait_for_port "router"           8888
 wait_for_port "swiss-army-knife" 8787
 wait_for_port "face-api"         8400
 wait_for_port "vision"           8500
+wait_for_port "code-analyzer"    8900
 
 # =============================================================================
 #  UI LAYER  (selected by --ui flag)
@@ -388,6 +402,7 @@ echo -e "  ${BOLD}Memory${NC}               ${CYAN}http://localhost:8686${NC}"
 echo -e "  ${BOLD}Web Fetcher${NC}          ${CYAN}http://localhost:8099${NC}"
 echo -e "  ${BOLD}Face API${NC}             ${CYAN}http://localhost:8400${NC}"
 echo -e "  ${BOLD}Vision${NC}               ${CYAN}http://localhost:8500${NC}"
+echo -e "  ${BOLD}Code Analyzer${NC}        ${CYAN}http://localhost:8900${NC}"
 echo -e "  ${BOLD}Kafka${NC}                ${CYAN}localhost:9094${NC}"
 echo -e "  ${BOLD}MinIO Console${NC}        ${CYAN}http://localhost:9001${NC}"
 echo ""
