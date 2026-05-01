@@ -1,10 +1,8 @@
-import { app, shell, BrowserWindow, ipcMain, systemPreferences, session, globalShortcut, screen } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, systemPreferences, session, globalShortcut, screen, clipboard } from 'electron'
 import { join } from 'path'
-import { homedir } from 'os'
-import { readFileSync } from 'fs'
-import bcrypt from 'bcryptjs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { registerWalletIpc } from './wallet/ipc'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -62,6 +60,14 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.on('ping', () => console.log('pong'))
+
+  ipcMain.handle('clipboard:write-text', (_e, text: string) => {
+    if (typeof text !== 'string') throw new Error('text must be a string')
+    clipboard.writeText(text)
+    return true
+  })
+
+  registerWalletIpc()
 
   ipcMain.handle('biometric-available', () => {
     if (process.platform === 'darwin') {

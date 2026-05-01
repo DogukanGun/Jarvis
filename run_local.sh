@@ -166,6 +166,8 @@ export MEMORY_BASE_URL="http://localhost:8686"
 export WEB_FETCHER_BASE_URL="http://localhost:8099"
 export VISION_BASE_URL="http://localhost:8500"
 export CODE_ANALYZER_BASE_URL="http://localhost:8900"
+export SOLANA_TRADER_BASE_URL="http://localhost:8901"
+export SOLANA_STRATEGY_BASE_URL="http://localhost:8902"
 export NEXT_PUBLIC_ROUTER_URL="http://localhost:8888"
 
 # =============================================================================
@@ -202,6 +204,19 @@ setup_venv() {
     info "  Installing deps for $(basename "$dir")..."
     "$venv/bin/pip" install -q --upgrade pip
     "$venv/bin/pip" install -q -r "$req"
+    ok "  $(basename "$dir") deps ready"
+}
+
+# Bootstrap a Node service: idempotent npm install if node_modules is missing.
+# Does NOT start the service — used for agents Electron spawns later (e.g. the
+# Solana trader, which needs the in-process loopback signer creds).
+setup_node_deps() {
+    local dir=$1
+    if [ ! -d "$dir/node_modules" ]; then
+        info "  npm install for $(basename "$dir") (first run)..."
+        ( cd "$dir" && npm install --silent ) > "$LOG_DIR/$(basename "$dir")-install.log" 2>&1 || \
+            warn "  $(basename "$dir") npm install failed — see $LOG_DIR/$(basename "$dir")-install.log"
+    fi
     ok "  $(basename "$dir") deps ready"
 }
 
@@ -282,6 +297,15 @@ info "Starting code-analyzer..."
     > "$LOG_DIR/code-analyzer.log" 2>&1 &
 PIDS+=($!)
 
+# 9. Solana agents (deps only — Electron spawns the actual processes after
+#    wallet unlock so they can receive the loopback signer creds).
+info "Bootstrapping Solana trader (npm install if needed)..."
+setup_node_deps "$ROOT/agent/solana-trader"
+
+info "Bootstrapping Solana strategy (venv if needed)..."
+setup_venv "$ROOT/agent/solana-strategy" "$ROOT/agent/solana-strategy/requirements.txt"
+ok "Solana agents ready — Electron will spawn them on wallet unlock"
+
 # 9. Swiss Army Knife (sudo for scapy raw sockets)
 DIR="$ROOT/agent/swiss-army-knife"
 setup_venv "$DIR" "$DIR/requirements.txt"
@@ -314,7 +338,6 @@ wait_for_port "web-fetcher"      8099
 wait_for_port "thinker"          8585
 wait_for_port "router"           8888
 wait_for_port "swiss-army-knife" 8787
-wait_for_port "face-api"         8400
 wait_for_port "vision"           8500
 wait_for_port "code-analyzer"    8900
 
@@ -403,6 +426,8 @@ echo -e "  ${BOLD}Web Fetcher${NC}          ${CYAN}http://localhost:8099${NC}"
 echo -e "  ${BOLD}Face API${NC}             ${CYAN}http://localhost:8400${NC}"
 echo -e "  ${BOLD}Vision${NC}               ${CYAN}http://localhost:8500${NC}"
 echo -e "  ${BOLD}Code Analyzer${NC}        ${CYAN}http://localhost:8900${NC}"
+echo -e "  ${BOLD}Solana Trader${NC}        ${CYAN}http://localhost:8901${NC}  ${YELLOW}(Electron spawns after wallet unlock)${NC}"
+echo -e "  ${BOLD}Solana Strategy${NC}      ${CYAN}http://localhost:8902${NC}  ${YELLOW}(Electron spawns after wallet unlock)${NC}"
 echo -e "  ${BOLD}Kafka${NC}                ${CYAN}localhost:9094${NC}"
 echo -e "  ${BOLD}MinIO Console${NC}        ${CYAN}http://localhost:9001${NC}"
 echo ""

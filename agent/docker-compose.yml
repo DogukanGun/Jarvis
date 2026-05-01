@@ -281,6 +281,44 @@ services:
       - jarvis-network
     restart: unless-stopped
 
+  # Solana Trader (Node + Solana Agent Kit v2)
+  # NOTE: this service is intentionally commented out by default. The trader
+  # signs by calling the Electron loopback signer at 127.0.0.1:<random>, which
+  # is the *desktop host*, not reachable from inside this container. In dev,
+  # the Electron main process spawns this agent locally as a child process.
+  # Uncomment and set the LOOPBACK_* env vars only if you've arranged host
+  # access from the container (e.g. host networking).
+  # solana-trader:
+  #   build:
+  #     context: ./solana-trader
+  #     dockerfile: Dockerfile
+  #   container_name: jarvis-solana-trader
+  #   network_mode: host
+  #   environment:
+  #     LOOPBACK_PORT: "${LOOPBACK_PORT:-}"
+  #     LOOPBACK_TOKEN: "${LOOPBACK_TOKEN:-}"
+  #     RPC_URL: "${RPC_URL:-https://api.devnet.solana.com}"
+  #     WALLET_PUBKEY: "${WALLET_PUBKEY:-}"
+  #     NETWORK: "${NETWORK:-devnet}"
+  #   restart: "no"
+
+  # Solana Strategy (Python FastAPI, indicator-driven)
+  # solana-strategy:
+  #   build:
+  #     context: ./solana-strategy
+  #     dockerfile: Dockerfile
+  #   container_name: jarvis-solana-strategy
+  #   ports:
+  #     - "8902:8902"
+  #   environment:
+  #     OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  #     ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  #     BIRDEYE_API_KEY: ${BIRDEYE_API_KEY:-}
+  #     TRADER_BASE_URL: http://host.docker.internal:8901
+  #   networks:
+  #     - jarvis-network
+  #   restart: unless-stopped
+
 volumes:
   postgres_data:
     driver: local

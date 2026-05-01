@@ -1,55 +1,51 @@
-"""LangChain 1.x agent runner for the code-analyzer agent."""
+"""LangChain 1.x agent runner for the solana-strategy agent."""
 
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
-from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
 from langchain.agents import create_agent
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 
 from app.agent.llm_factory import create_chat_model
 from app.agent.tools import build_agent_tools
 
 logger = logging.getLogger(__name__)
 
-AGENT_TIMEOUT_SECONDS = 600
+AGENT_TIMEOUT_SECONDS = 300
 
 SYSTEM_PROMPT = """\
-You are an expert code analysis agent with access to a suite of tools that build \
-and query knowledge graphs from source code repositories.
+You are a disciplined trading strategy agent for the Solana ecosystem.
 
-Your responsibilities:
-1. Analyse the user's request and decide which code analysis tools to use, in what order, \
-   and with what parameters.
-2. ALWAYS call index_repo first for any repo/codebase that has not yet been indexed. \
-   Pass the repo_id returned by index_repo to subsequent tool calls.
-3. Execute tools one at a time. After each result, reason about what you found and \
-   decide whether to run more tools or conclude.
-4. When you have a complete picture, call compile_report with a thorough summary.
-5. Return a clear, well-structured final answer to the user.
+Your job is to analyse a user request, fetch any market data you need, run the \
+appropriate technical indicators, decide whether a trade is warranted, and either \
+emit a TradeIntent (via make_trade_intent) for the user to confirm, or report \
+"no trade" with the reasoning.
 
-Code analysis guidelines:
-- If the user provides a GitHub URL, pass it directly to index_repo as repo_source.
-- If the user asks about a local path, pass the absolute path as repo_source.
-- For "what calls X?" or "who depends on X?" questions, use get_impact with direction="upstream".
-- For "what does X call?" questions, use get_impact with direction="downstream".
-- For "explain function X" or "show me X", use get_symbol_context.
-- For "list API endpoints/routes", use get_routes.
-- For general search ("find all auth code", "where is X implemented?"), use query_code.
-- For "show graph", "visualize", "map the codebase", "draw the graph" → use visualize_graph with the repo_id.
-- Never invent tool names — only use the tools available to you.
+Hard rules:
+- You NEVER sign or broadcast transactions yourself. Execution is handled by the \
+  trader service after the user confirms an intent.
+- For any "should I buy/sell?" question, you MUST run indicator_signal on real \
+  candle data (use fetch_ohlcv first if you don't already have closes).
+- Bias toward conservatism: hold beats a low-confidence intent. Only emit an \
+  intent when confidence ≥ 0.4.
+- Be precise about position sizing — do not invent capital; use values the user \
+  provides. If the user didn't specify size, ask via the report rather than \
+  guessing.
+- Always end the session by calling compile_report with a summary, the tools \
+  you used, and any intents you emitted.
 """
 
 
 def _extract_from_messages(
     messages: List[BaseMessage],
-) -> tuple[str, List[str], List[Dict[str, Any]], Dict[str, Any]]:
+) -> tuple[str, List[str], List[Dict[str, Any]], Dict[str, Any], List[Dict[str, Any]]]:
     tools_used: List[str] = []
     findings: List[Dict[str, Any]] = []
+    intents: List[Dict[str, Any]] = []
     report: Dict[str, Any] = {}
     final_answer: str = ""
 
@@ -57,9 +53,9 @@ def _extract_from_messages(
         if isinstance(msg, AIMessage):
             if msg.tool_calls:
                 for tc in msg.tool_calls:
-                    tool_name: str = tc.get("name", "") if isinstance(tc, dict) else getattr(tc, "name", "")
-                    if tool_name:
-                        tools_used.append(tool_name)
+                    name = tc.get("name", "") if isinstance(tc, dict) else getattr(tc, "name", "")
+                    if name:
+                        tools_used.append(name)
             else:
                 if isinstance(msg.content, str):
                     final_answer = msg.content
@@ -75,12 +71,25 @@ def _extract_from_messages(
             if tool_name == "compile_report":
                 try:
                     report = json.loads(output_str)
+                    if isinstance(report.get("intents"), list):
+                        intents = report["intents"]
                 except (json.JSONDecodeError, TypeError):
                     report = {"summary": output_str, "status": "complete"}
                 continue
 
+            if tool_name == "make_trade_intent":
+                # Try to lift the structured intent from the JSON dump in the body.
+                try:
+                    last_brace = output_str.rfind("{")
+                    body = output_str[last_brace:]
+                    parsed = json.loads(body)
+                    if isinstance(parsed, dict) and "intent" in parsed:
+                        intents.append(parsed["intent"])
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    pass
+
             findings.append({
-                "type": "code_analysis",
+                "type": "strategy",
                 "tool": tool_name,
                 "details": {"raw_output": output_str[:2000]},
             })
@@ -92,27 +101,19 @@ def _extract_from_messages(
                 if isinstance(content, str) and content:
                     final_answer = content
                     break
-                elif isinstance(content, list):
-                    text = " ".join(
-                        b.get("text", "") if isinstance(b, dict) else str(b)
-                        for b in content
-                    ).strip()
-                    if text:
-                        final_answer = text
-                        break
 
-    if not report and findings:
+    if not report:
         report = {
             "summary": final_answer,
             "tools_used": tools_used,
+            "intents": intents,
             "total_findings": len(findings),
-            "findings": findings,
         }
-    elif report:
-        report.setdefault("findings", findings)
+    else:
+        report.setdefault("intents", intents)
         report.setdefault("tools_used", tools_used)
 
-    return final_answer, tools_used, findings, report
+    return final_answer, tools_used, findings, report, intents
 
 
 async def run_agent(
@@ -132,6 +133,7 @@ async def run_agent(
         "confirmed": confirmed,
         "tools_used": [],
         "findings": [],
+        "intents": [],
         "report": {},
         "response": "",
         "error": None,
@@ -145,18 +147,12 @@ async def run_agent(
 
     try:
         tools = build_agent_tools()
-
         if target_tools:
             workflow_names = {"compile_report"}
             tools = [t for t in tools if t.name in target_tools or t.name in workflow_names]
 
         llm = create_chat_model()
-
-        graph = create_agent(
-            model=llm,
-            tools=tools,
-            system_prompt=SYSTEM_PROMPT,
-        )
+        graph = create_agent(model=llm, tools=tools, system_prompt=SYSTEM_PROMPT)
 
         try:
             result = await asyncio.wait_for(
@@ -165,24 +161,25 @@ async def run_agent(
             )
         except asyncio.TimeoutError:
             base_result["error"] = f"Agent timed out after {AGENT_TIMEOUT_SECONDS}s"
-            base_result["response"] = "The analysis timed out. Try a simpler query or a smaller repo."
+            base_result["response"] = "The strategy run timed out."
             return base_result
 
         messages = result.get("messages", [])
-        final_answer, tools_used, findings, report = _extract_from_messages(messages)
+        final_answer, tools_used, findings, report, intents = _extract_from_messages(messages)
 
         return {
             **base_result,
-            "response": final_answer or report.get("summary", "Analysis complete."),
+            "response": final_answer or report.get("summary", "Strategy run complete."),
             "tools_used": tools_used,
             "findings": findings,
+            "intents": intents,
             "report": report,
         }
 
     except Exception as exc:
-        logger.exception("Agent run failed: %s", exc)
+        logger.exception("Strategy agent run failed: %s", exc)
         return {
             **base_result,
             "error": str(exc),
-            "response": f"Code analysis failed: {exc}",
+            "response": f"Strategy run failed: {exc}",
         }

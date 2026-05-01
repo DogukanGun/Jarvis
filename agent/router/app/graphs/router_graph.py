@@ -16,6 +16,8 @@ from .nodes import (
     invoke_web_fetcher,
     invoke_swiss_knife,
     invoke_code_analyzer,
+    invoke_solana_trader,
+    invoke_solana_strategy,
     generate_response,
     write_memory,
 )
@@ -36,6 +38,10 @@ def _intent_router(state: RouterGraphState) -> str:
         return "visual"
     elif intent == "code_analysis":
         return "code_analysis"
+    elif intent == "solana_trade":
+        return "solana_trade"
+    elif intent == "solana_strategy":
+        return "solana_strategy"
     else:
         return "chat"
 
@@ -66,6 +72,8 @@ def create_router_graph():
     graph.add_node("invoke_web_fetcher", invoke_web_fetcher)
     graph.add_node("invoke_swiss_knife", invoke_swiss_knife)
     graph.add_node("invoke_code_analyzer", invoke_code_analyzer)
+    graph.add_node("invoke_solana_trader", invoke_solana_trader)
+    graph.add_node("invoke_solana_strategy", invoke_solana_strategy)
     graph.add_node("generate_response", generate_response)
     # write_memory is intentionally NOT in the graph — it is fired as a
     # background task in server.py after the WebSocket response is sent,
@@ -88,6 +96,8 @@ def create_router_graph():
             "web_fetch": "invoke_web_fetcher",
             "security": "invoke_swiss_knife",
             "code_analysis": "invoke_code_analyzer",
+            "solana_trade": "invoke_solana_trader",
+            "solana_strategy": "invoke_solana_strategy",
         },
     )
 
@@ -96,6 +106,8 @@ def create_router_graph():
     graph.add_edge("invoke_web_fetcher", "generate_response")
     graph.add_edge("invoke_swiss_knife", "generate_response")
     graph.add_edge("invoke_code_analyzer", "generate_response")
+    graph.add_edge("invoke_solana_trader", "generate_response")
+    graph.add_edge("invoke_solana_strategy", "generate_response")
 
     # Response -> END (write_memory happens async in server.py)
     graph.add_edge("generate_response", END)

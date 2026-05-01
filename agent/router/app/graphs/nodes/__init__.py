@@ -8,6 +8,8 @@ from .generate_response import generate_response
 from .write_memory import write_memory
 from .process_visual import process_visual
 from .invoke_code_analyzer import invoke_code_analyzer
+from .invoke_solana_trader import invoke_solana_trader
+from .invoke_solana_strategy import invoke_solana_strategy
 
 __all__ = [
     "retrieve_memory",
@@ -17,6 +19,8 @@ __all__ = [
     "invoke_web_fetcher",
     "invoke_swiss_knife",
     "invoke_code_analyzer",
+    "invoke_solana_trader",
+    "invoke_solana_strategy",
     "generate_response",
     "write_memory",
     "process_visual",

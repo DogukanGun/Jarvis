@@ -125,13 +125,16 @@ function TaskWindowPanel({
 export default function Chat({
   userId = 'admin',
   onGuardMode,
+  onOpenWallet,
 }: {
   userId?: string
   onGuardMode?: () => void
+  onOpenWallet?: () => void
 }): React.JSX.Element {
   const [messages, setMessages] = useState<Message[]>([])
   const [toolLog, setToolLog] = useState<LogEntry[]>([])
   const [taskWindows, setTaskWindows] = useState<TaskWindow[]>([])
+  const [graphUrl, setGraphUrl] = useState<string | null>(null)
   const [waiting, setWaiting] = useState(false)
   const [textInput, setTextInput] = useState('')
 
@@ -148,9 +151,16 @@ export default function Chat({
     })
   }, [])
 
+  const VIZ_URL_RE = /http:\/\/localhost:\d+\/api\/repos\/[^\s/]+\/visualize/
+
   const onResponse = useCallback((data: WsResponse) => {
     setWaiting(false)
     setToolLog([]) // clear tool log when response arrives
+
+    // Auto-open graph visualization if the response contains a viz URL
+    const vizMatch = data.content?.match(VIZ_URL_RE)
+    if (vizMatch) setGraphUrl(vizMatch[0])
+
     setMessages((prev) => {
       const finalized = prev.map((m) =>
         m.isTyping ? { ...m, displayedContent: m.content, isTyping: false } : m
@@ -474,6 +484,12 @@ export default function Chat({
             </button>
           )}
 
+          {onOpenWallet && (
+            <button className="wallet-mode-btn" onClick={onOpenWallet}>
+              WALLET
+            </button>
+          )}
+
           <Panel label="CAM_FEED" accent={cameraActive ? '#4ade80' : '#444'} className="cam-panel">
             <div className="cam-body">
               <video
@@ -509,6 +525,23 @@ export default function Chat({
               <div ref={toolLogEndRef} />
             </div>
           </Panel>
+
+          {/* ── Graph view ── */}
+          {graphUrl && (
+            <Panel label="GRAPH_VIEW" accent="#a78bfa" className="graph-panel">
+              <button
+                className="graph-panel-close"
+                onClick={() => setGraphUrl(null)}
+                aria-label="Close graph"
+              >✕</button>
+              <iframe
+                src={graphUrl}
+                className="graph-iframe"
+                sandbox="allow-scripts allow-same-origin"
+                title="Knowledge Graph"
+              />
+            </Panel>
+          )}
 
           {/* ── Task windows ── */}
           {taskWindows.map((win) => (
