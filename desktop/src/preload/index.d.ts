@@ -38,7 +38,7 @@ export interface WalletStatus {
 export type SpawnState = 'not-installed' | 'spawning' | 'running' | 'crashed' | 'stopped'
 
 export interface AgentStatus {
-  name: 'solana-trader' | 'solana-strategy'
+  name: 'solana-trader' | 'solana-strategy' | 'legal-rag'
   state: SpawnState
   port: number
   pid: number | null
@@ -47,16 +47,18 @@ export interface AgentStatus {
   lastError: string | null
 }
 
+export type AgentSnapshot = { trader: AgentStatus; strategy: AgentStatus; legalRag: AgentStatus }
+
 export interface AgentsApi {
-  status: () => Promise<{ trader: AgentStatus; strategy: AgentStatus }>
+  status: () => Promise<AgentSnapshot>
   installTrader: () => Promise<{ ok: boolean; code: number | null }>
   installStrategy: () => Promise<{ ok: boolean; code: number | null }>
-  restartTrader: () => Promise<{ trader: AgentStatus; strategy: AgentStatus }>
-  restartStrategy: () => Promise<{ trader: AgentStatus; strategy: AgentStatus }>
-  startAll: () => Promise<{ trader: AgentStatus; strategy: AgentStatus }>
-  onStatusChange: (
-    callback: (snapshot: { trader: AgentStatus; strategy: AgentStatus }) => void,
-  ) => () => void
+  installLegalRag: () => Promise<{ ok: boolean; code: number | null }>
+  restartTrader: () => Promise<AgentSnapshot>
+  restartStrategy: () => Promise<AgentSnapshot>
+  restartLegalRag: () => Promise<AgentSnapshot>
+  startAll: () => Promise<AgentSnapshot>
+  onStatusChange: (callback: (snapshot: AgentSnapshot) => void) => () => void
   onInstallLog: (callback: (line: string) => void) => () => void
 }
 
@@ -97,6 +99,9 @@ export interface WalletApi {
   wipe: () => Promise<boolean>
   unlock: (pin: string) => Promise<{ ok: boolean; publicKey?: string; error?: string }>
   verifyPin: (pin: string) => Promise<boolean>
+  exportPrivateKey: (
+    pin: string,
+  ) => Promise<{ ok: boolean; base58?: string; array?: number[]; error?: string }>
   lock: () => Promise<boolean>
   getConfig: () => Promise<WalletConfig>
   setConfig: (patch: Partial<WalletConfig>) => Promise<WalletConfig>
@@ -106,7 +111,15 @@ export interface WalletApi {
     holdings: TokenHolding[]
     network: Network
   }>
-  airdrop: (sol: number) => Promise<string>
+  airdrop: (
+    sol: number,
+  ) => Promise<{
+    ok: boolean
+    signature?: string
+    error?: string
+    code?: string
+    webFaucetUrl?: string
+  }>
   sendSol: (to: string, sol: number) => Promise<{ signature: string; explorerBase: string }>
   sendSpl: (
     to: string,
@@ -115,6 +128,13 @@ export interface WalletApi {
   ) => Promise<{ signature: string; explorerBase: string }>
   onLockChange: (callback: (unlocked: boolean) => void) => () => void
   session: WalletSessionApi
+  panicSell: () => Promise<{
+    ok: boolean
+    drained?: boolean
+    openCount?: number
+    waitedMs?: number
+    error?: string
+  }>
 }
 
 export interface JarvisApi {
@@ -129,6 +149,7 @@ export interface JarvisApi {
   biometricAvailable: () => Promise<boolean>
   biometricVerify: (reason: string) => Promise<boolean>
   copyText: (text: string) => Promise<boolean>
+  openExternal: (url: string) => Promise<boolean>
   wallet: WalletApi
   agents: AgentsApi
 }

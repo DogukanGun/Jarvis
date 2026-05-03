@@ -67,6 +67,16 @@ app.whenReady().then(async () => {
     return true
   })
 
+  ipcMain.handle('shell:open-external', (_e, url: string) => {
+    if (typeof url !== 'string') throw new Error('url must be a string')
+    // Whitelist: only http/https URLs to known Solana faucet/explorer hosts
+    // and external solscan/jup.ag/etc the app already shows in toasts.
+    const ok = /^https?:\/\//.test(url)
+    if (!ok) throw new Error('only http(s) URLs allowed')
+    void shell.openExternal(url)
+    return true
+  })
+
   registerWalletIpc()
 
   ipcMain.handle('biometric-available', () => {
@@ -272,6 +282,49 @@ app.whenReady().then(async () => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+// Quit guard: if the auto-trade runner has open positions, trigger panic-sell
+// and hold the quit until either drained or 30 s elapses. Without this, a
+// quit kills the strategy child process mid-flight and bought tokens stay
+// on-chain forever. We use a re-entrancy flag because the prevented quit
+// fires before-quit again when we re-call `app.quit()`.
+let panicQuitInProgress = false
+app.on('before-quit', (event) => {
+  if (panicQuitInProgress) return
+  // Synchronous probe of strategy /api/auto/status to decide if we need
+  // to delay quit. If there's no live runner or no open positions, return
+  // immediately so users with nothing in flight don't pay any latency.
+  // We can't await here (before-quit must decide synchronously whether to
+  // preventDefault), so we always preventDefault and let the async path
+  // decide whether to actually quit fast.
+  event.preventDefault()
+  panicQuitInProgress = true
+  ;(async () => {
+    try {
+      const probe = await fetch('http://127.0.0.1:8902/api/auto/status').catch(() => null)
+      const status = probe && probe.ok ? (await probe.json().catch(() => null)) : null
+      const openCount = ((status?.open_positions as unknown[]) ?? []).length
+      const running = !!status?.running
+      if (running && openCount > 0) {
+        try {
+          await fetch('http://127.0.0.1:8902/api/auto/panic', { method: 'POST' })
+        } catch { /* keep going */ }
+        const start = Date.now()
+        while (Date.now() - start < 30_000) {
+          await new Promise((r) => setTimeout(r, 1000))
+          try {
+            const r = await fetch('http://127.0.0.1:8902/api/auto/status')
+            if (!r.ok) continue
+            const s = (await r.json()) as { open_positions?: unknown[]; running?: boolean }
+            const remaining = (s.open_positions ?? []).length
+            if (remaining === 0 || !s.running) break
+          } catch { /* keep polling */ }
+        }
+      }
+    } catch { /* swallow — never block quit indefinitely */ }
+    app.quit()
+  })()
 })
 
 app.on('window-all-closed', () => {

@@ -90,6 +90,8 @@ export default function Trade({ onBack }: Props): React.JSX.Element {
     }
   }, [])
 
+  const onDevnet = health.network === 'devnet'
+
   useEffect(() => {
     void checkHealth()
     const id = setInterval(checkHealth, 5000)
@@ -168,6 +170,9 @@ export default function Trade({ onBack }: Props): React.JSX.Element {
 
   async function handleSwap(): Promise<void> {
     setError(null)
+    if (onDevnet) {
+      return fail('Jupiter swap requires mainnet. Switch network on the Wallet page.')
+    }
     const amt = parseFloat(amount)
     if (!Number.isFinite(amt) || amt <= 0) return fail('Invalid amount')
     setSwapBusy(true)
@@ -188,6 +193,9 @@ export default function Trade({ onBack }: Props): React.JSX.Element {
 
   async function handleLaunchPumpfun(): Promise<void> {
     setError(null)
+    if (onDevnet) {
+      return fail('Pump.fun is mainnet-only. Switch network on the Wallet page.')
+    }
     if (!pfName || !pfTicker || !pfDescription || !pfImageUrl) {
       return fail('Fill in name, ticker, description, image URL')
     }
@@ -295,6 +303,15 @@ export default function Trade({ onBack }: Props): React.JSX.Element {
         onInstall={handleInstallStrategy}
         onRestart={handleRestartStrategy}
       />
+
+      {onDevnet && (
+        <div className="trade-devnet-banner">
+          <strong>You're on devnet.</strong> Jupiter swap, Pump.fun, and the
+          indicator/copy-trade auto strategies all require <em>mainnet</em>.
+          Devnet has no DEX liquidity — only SOL/SPL transfers will work here.
+          Switch network in the Wallet page to use trading features.
+        </div>
+      )}
 
 
       {error && <div className="wallet-error">{error}</div>}
@@ -436,7 +453,7 @@ export default function Trade({ onBack }: Props): React.JSX.Element {
         </div>
       )}
 
-      {tab === 'auto' && <AutoTradeTab traderRunning={!!health.ok} />}
+      {tab === 'auto' && <AutoTradeTab traderRunning={!!health.ok} onDevnet={onDevnet} />}
     </div>
   )
 }
@@ -451,6 +468,20 @@ interface AutoEvent {
   [key: string]: unknown
 }
 
+interface OpenPosition {
+  mint: string
+  symbol?: string
+  entry_price: number
+  entry_sol: number
+  quantity: number
+  age_sec: number
+  take_profit_price: number | null
+  stop_loss_price: number | null
+  max_hold_time: number | null
+  sell_attempted: boolean
+  last_error: string | null
+}
+
 interface SessionPolicy {
   id: string
   strategy: AutoStrategyKey
@@ -462,12 +493,25 @@ interface SessionPolicy {
   allowedActions: string[]
 }
 
-function AutoTradeTab({ traderRunning }: { traderRunning: boolean }): React.JSX.Element {
+function AutoTradeTab({
+  traderRunning,
+  onDevnet,
+}: {
+  traderRunning: boolean
+  onDevnet: boolean
+}): React.JSX.Element {
   const [strategy, setStrategy] = useState<AutoStrategyKey>('indicator')
   const [maxTradeSol, setMaxTradeSol] = useState('0.01')
   const [totalBudgetSol, setTotalBudgetSol] = useState('0.05')
-  const [durationMin, setDurationMin] = useState('15')
   const [intervalSec, setIntervalSec] = useState('30')
+  // Exit strategy (chainstacklabs Position semantics).
+  // Max-hold defaults to EMPTY = "hold until I stop it (or TP/SL fires)".
+  // The runner exits naturally only when (a) you click Stop & drain, (b) the
+  // 🚨 button is pressed, or (c) a TP/SL condition fires. This matches the
+  // user's expectation of "work until I stop it".
+  const [takeProfitPct, setTakeProfitPct] = useState('50')   // %
+  const [stopLossPct, setStopLossPct] = useState('30')       // %
+  const [maxHoldSec, setMaxHoldSec] = useState('')           // seconds; empty = hold forever
 
   // Indicator config
   const [watchlist, setWatchlist] = useState('So11111111111111111111111111111111111111112')
@@ -483,6 +527,10 @@ function AutoTradeTab({ traderRunning }: { traderRunning: boolean }): React.JSX.
   const [events, setEvents] = useState<AutoEvent[]>([])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [sessionLost, setSessionLost] = useState<{ stuck: string[] } | null>(null)
+  const [panic, setPanic] = useState<{ active: boolean; reason: string | null }>({ active: false, reason: null })
+  const [openCount, setOpenCount] = useState(0)
+  const [positions, setPositions] = useState<OpenPosition[]>([])
   const esRef = useRef<EventSource | null>(null)
 
   // Subscribe to session changes from main.
@@ -492,15 +540,11 @@ function AutoTradeTab({ traderRunning }: { traderRunning: boolean }): React.JSX.
     return () => off()
   }, [])
 
-  // SSE subscription to strategy events while a session is active.
+  // SSE subscription to strategy events. Stays open across the whole
+  // Auto-Trade tab session — even if the policy gets nuked we still want
+  // to show what's happening (so the user can see "session-lost" events
+  // and know they need to re-authorize).
   useEffect(() => {
-    if (!session) {
-      if (esRef.current) {
-        esRef.current.close()
-        esRef.current = null
-      }
-      return
-    }
     if (esRef.current) return
     const es = new EventSource('http://localhost:8902/api/auto/events')
     esRef.current = es
@@ -508,16 +552,67 @@ function AutoTradeTab({ traderRunning }: { traderRunning: boolean }): React.JSX.
       try {
         const ev = JSON.parse(e.data) as AutoEvent
         setEvents((prev) => [...prev.slice(-300), ev])
+        if (ev.kind === 'session-lost') {
+          const stuck = (ev.stuck_positions as string[]) ?? []
+          setSessionLost({ stuck })
+        }
+        if (ev.kind === 'panic-mode-entered') {
+          setPanic({ active: true, reason: (ev.reason as string) || 'unknown' })
+        }
+        if (ev.kind === 'stopped' || ev.kind === 'drained' || ev.kind === 'ended') {
+          setPanic({ active: false, reason: null })
+        }
       } catch { /* ignore */ }
     }
-    es.onerror = () => {
-      // strategy died or stream cut — leave silently
-    }
+    es.onerror = () => { /* strategy down or stream paused — leave silently */ }
     return () => {
       es.close()
       esRef.current = null
     }
-  }, [session])
+  }, [])
+
+  // Dead-man's-switch: while the Auto-Trade tab is mounted, send a
+  // heartbeat to the strategy every 5 s. The watchdog there enters
+  // panic-sell if it doesn't see a heartbeat for 60 s — i.e. closing
+  // the tab, navigating away, or shutting the app triggers liquidation.
+  useEffect(() => {
+    let cancelled = false
+    const ping = (): void => {
+      void fetch('http://localhost:8902/api/auto/heartbeat', { method: 'POST' })
+        .catch(() => { /* strategy down — watchdog there is the safety net */ })
+    }
+    ping()
+    const id = setInterval(() => { if (!cancelled) ping() }, 5000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [])
+
+  // Poll status to keep open-positions, panic indicator, and the visual
+  // positions panel fresh. SSE covers most updates but the position list
+  // is part of the status response, not the event stream.
+  useEffect(() => {
+    let cancelled = false
+    const refresh = async (): Promise<void> => {
+      try {
+        const r = await fetch('http://localhost:8902/api/auto/status')
+        if (!r.ok) return
+        const j = (await r.json()) as {
+          open_positions?: OpenPosition[]
+          panic?: boolean
+          panic_reason?: string | null
+        }
+        if (cancelled) return
+        const list = j.open_positions ?? []
+        setPositions(list)
+        setOpenCount(list.length)
+        if (j.panic) setPanic({ active: true, reason: j.panic_reason ?? null })
+      } catch { /* */ }
+    }
+    void refresh()
+    // 3s poll while the tab is mounted — covers fresh price-target proximity
+    // and age countdown for the visual cards.
+    const id = setInterval(refresh, 3000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [])
 
   const allowedActions = (): string[] => {
     if (strategy === 'indicator' || strategy === 'copy_trade') return ['swap']
@@ -526,21 +621,37 @@ function AutoTradeTab({ traderRunning }: { traderRunning: boolean }): React.JSX.
 
   async function handleStart(): Promise<void> {
     setError(null)
+    if (onDevnet) {
+      return setError(
+        'Auto-trade requires mainnet. All three strategies (indicator / copy-trade / pumpfun_snipe) need DEX liquidity that devnet does not have. Switch network on the Wallet page.',
+      )
+    }
     const max = parseFloat(maxTradeSol)
     const total = parseFloat(totalBudgetSol)
-    const durMin = parseInt(durationMin, 10)
     const interval = parseInt(intervalSec, 10)
+    const tpPct = parseFloat(takeProfitPct)
+    const slPct = parseFloat(stopLossPct)
+    const maxHold = parseInt(maxHoldSec, 10)
     if (!Number.isFinite(max) || max <= 0) return setError('max trade > 0')
     if (!Number.isFinite(total) || total < max) return setError('budget must be >= max trade')
-    if (!Number.isFinite(durMin) || durMin < 1) return setError('duration must be >= 1 min')
+    if (Number.isFinite(maxHold) && maxHold > 0 && maxHold < 5) {
+      return setError('max hold must be >= 5s (or empty to disable)')
+    }
+    // Note: we used to require at least one exit condition. Removed — if you
+    // leave TP/SL/max-hold all empty, the bot just keeps buying until budget
+    // is spent and holds until you click Stop & drain or 🚨. The watchdog
+    // still acts as a safety net if the page goes down.
 
     setBusy(true)
     try {
+      // 24h hard safety cap on the session — actual end is position-driven
+      // (the strategy runner exits when graceful-stop is requested AND all
+      // open positions are sold).
       const policy = await window.api.wallet.session.start({
         strategy,
         maxTradeSol: max,
         totalBudgetSol: total,
-        durationSec: durMin * 60,
+        durationSec: 24 * 60 * 60,
         allowedActions: allowedActions() as ('swap' | 'transfer' | 'pumpfun_buy' | 'pumpfun_sell')[],
       })
       const watchlistArr = watchlist
@@ -561,6 +672,10 @@ function AutoTradeTab({ traderRunning }: { traderRunning: boolean }): React.JSX.
         rug_score_max: parseFloat(rugScoreMax) || 0.5,
         min_liquidity_sol: parseFloat(minLiquiditySol) || 5,
         max_buy_sol: parseFloat(maxBuySol) || max,
+        // Exit strategy: server expects fractions (0.5 = 50%); null disables.
+        take_profit_pct: Number.isFinite(tpPct) && tpPct > 0 ? tpPct / 100 : null,
+        stop_loss_pct: Number.isFinite(slPct) && slPct > 0 ? slPct / 100 : null,
+        max_hold_time: Number.isFinite(maxHold) && maxHold > 0 ? maxHold : null,
       }
       const r = await fetch('http://localhost:8902/api/auto/start', {
         method: 'POST',
@@ -581,7 +696,32 @@ function AutoTradeTab({ traderRunning }: { traderRunning: boolean }): React.JSX.
     }
   }
 
-  async function handleStop(): Promise<void> {
+  async function handleStopGraceful(): Promise<void> {
+    setBusy(true)
+    try {
+      // No new buys; runner keeps ticking and selling existing positions
+      // until the position list is empty, then exits naturally.
+      try { await fetch('http://localhost:8902/api/auto/stop-graceful', { method: 'POST' }) } catch { /* */ }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handlePanicSell(): Promise<void> {
+    setBusy(true)
+    try {
+      const result = await window.api.wallet.panicSell()
+      if (!result.ok) {
+        setError(result.error ?? 'panic-sell failed')
+      } else if (!result.drained) {
+        setError(`panic-sell timed out after ${Math.round((result.waitedMs ?? 0) / 1000)}s — ${result.openCount ?? '?'} positions may still be open`)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleStopForce(): Promise<void> {
     setBusy(true)
     try {
       try { await fetch('http://localhost:8902/api/auto/stop', { method: 'POST' }) } catch { /* */ }
@@ -596,11 +736,87 @@ function AutoTradeTab({ traderRunning }: { traderRunning: boolean }): React.JSX.
 
   return (
     <div className="trade-panel">
-      <div className="trade-panel-title">AUTONOMOUS TRADING</div>
+      <div className="trade-panel-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span>AUTONOMOUS TRADING</span>
+        {session && !panic.active && (
+          <span className="watchdog-pill watchdog-active" title="UI heartbeat reaching the watchdog every 5s">
+            ● watchdog active
+          </span>
+        )}
+        {panic.active && (
+          <span className="watchdog-pill watchdog-panic" title={`Panic reason: ${panic.reason ?? 'unknown'}`}>
+            ⚠ PANIC: {panic.reason ?? 'firing'}
+          </span>
+        )}
+      </div>
+      {onDevnet && !session && (
+        <p className="wallet-subtitle wallet-error" style={{ textAlign: 'left' }}>
+          Auto-trade needs mainnet (Jupiter / Pump.fun aren&apos;t deployed on devnet).
+          Switch network on the Wallet page first.
+        </p>
+      )}
       {!traderRunning && !session && (
         <p className="wallet-subtitle" style={{ textAlign: 'left' }}>
           Trader service must be running before you can start an auto-trade session.
         </p>
+      )}
+
+      {sessionLost && (
+        <div className="wallet-error" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div>
+            <strong>Session lost mid-trade.</strong> The signer rejected with
+            &quot;no active session&quot;. {sessionLost.stuck.length > 0
+              ? `${sessionLost.stuck.length} position(s) are still held on-chain and need to be sold.`
+              : 'No open positions are stuck.'}
+          </div>
+          {sessionLost.stuck.length > 0 && (
+            <div style={{ fontSize: 11, color: 'rgba(180,220,180,0.7)', wordBreak: 'break-all' }}>
+              Stuck: {sessionLost.stuck.join(', ')}
+            </div>
+          )}
+          <div className="wallet-actions">
+            {sessionLost.stuck.length > 0 ? (
+              <button
+                className="wallet-btn-primary"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true)
+                  try {
+                    // Mint a fresh session policy with budget = sum of stuck
+                    // entry SOL + a small buffer for sell-side priority fees.
+                    const max = parseFloat(maxTradeSol) || 0.01
+                    const policy = await window.api.wallet.session.start({
+                      strategy,
+                      maxTradeSol: max,
+                      totalBudgetSol: Math.max(parseFloat(totalBudgetSol) || 0.05, 0.01),
+                      durationSec: 24 * 60 * 60,
+                      allowedActions: ['pumpfun_sell', 'pumpfun_buy', 'swap'],
+                    })
+                    const r = await fetch('http://localhost:8902/api/auto/resume', {
+                      method: 'POST',
+                      headers: { 'content-type': 'application/json' },
+                      body: JSON.stringify({ policy_id: policy.id }),
+                    })
+                    if (!r.ok) throw new Error(await r.text())
+                    setSessionLost(null)
+                  } catch (e) {
+                    setError((e as Error).message)
+                  } finally {
+                    setBusy(false)
+                  }
+                }}
+              >
+                {busy ? 'Authorizing…' : 'Resume & sell stuck positions (Touch ID)'}
+              </button>
+            ) : null}
+            <button
+              className="wallet-btn-secondary"
+              onClick={() => setSessionLost(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
       )}
 
       {!session && (
@@ -691,15 +907,37 @@ function AutoTradeTab({ traderRunning }: { traderRunning: boolean }): React.JSX.
               />
             </div>
           </div>
+          <div className="trade-result-label" style={{ marginTop: 6 }}>EXIT STRATEGY</div>
           <div className="trade-row">
             <div className="trade-col">
-              <label className="trade-label">Duration (minutes)</label>
+              <label className="trade-label">Take profit (%)</label>
               <input
                 className="wallet-input"
-                value={durationMin}
-                onChange={(e) => setDurationMin(e.target.value)}
+                value={takeProfitPct}
+                onChange={(e) => setTakeProfitPct(e.target.value)}
+                placeholder="50"
               />
             </div>
+            <div className="trade-col">
+              <label className="trade-label">Stop loss (%)</label>
+              <input
+                className="wallet-input"
+                value={stopLossPct}
+                onChange={(e) => setStopLossPct(e.target.value)}
+                placeholder="30"
+              />
+            </div>
+            <div className="trade-col">
+              <label className="trade-label">Max hold (seconds, optional)</label>
+              <input
+                className="wallet-input"
+                value={maxHoldSec}
+                onChange={(e) => setMaxHoldSec(e.target.value)}
+                placeholder="(empty = hold until you stop)"
+              />
+            </div>
+          </div>
+          <div className="trade-row">
             <div className="trade-col">
               <label className="trade-label">Tick interval (seconds)</label>
               <input
@@ -710,15 +948,25 @@ function AutoTradeTab({ traderRunning }: { traderRunning: boolean }): React.JSX.
             </div>
           </div>
 
+          <p className="wallet-subtitle" style={{ textAlign: 'left', fontSize: 11, color: 'rgba(180,220,180,0.55)' }}>
+            Position-based session. Exits use chainstacklabs/pumpfun-bonkfun-bot
+            semantics: first of take-profit / stop-loss / max-hold to fire wins.
+            Live price comes from pump.fun&apos;s public bonding-curve endpoint.
+            <strong> Max-hold is optional</strong> — leave it empty and positions
+            stay open until TP or SL fires, you click <em>Stop &amp; drain</em>,
+            or you hit <em>🚨 Sell everything now</em>. Leaving TP/SL empty too
+            puts the bot in pure manual mode (only Stop or 🚨 will close).
+          </p>
+
           {error && <div className="wallet-error">{error}</div>}
 
           <div className="wallet-actions">
             <button
               className="wallet-btn-primary"
-              disabled={busy || !traderRunning}
+              disabled={busy || !traderRunning || onDevnet}
               onClick={handleStart}
             >
-              {busy ? 'Starting…' : 'Start (Touch ID)'}
+              {busy ? 'Starting…' : onDevnet ? 'Start (mainnet only)' : 'Start (Touch ID)'}
             </button>
           </div>
         </>
@@ -743,8 +991,19 @@ function AutoTradeTab({ traderRunning }: { traderRunning: boolean }): React.JSX.
           </div>
 
           <div className="wallet-actions">
-            <button className="wallet-btn-danger" disabled={busy} onClick={handleStop}>
-              {busy ? 'Stopping…' : 'STOP NOW'}
+            <button className="wallet-btn-primary" disabled={busy} onClick={handleStopGraceful}>
+              {busy ? 'Stopping…' : 'Stop & drain positions'}
+            </button>
+            <button
+              className="wallet-btn-danger"
+              disabled={busy || openCount === 0}
+              onClick={handlePanicSell}
+              title="Bypass TP/SL/hold-time and sell every open position now"
+            >
+              {busy ? 'Selling…' : `🚨 Sell everything now${openCount > 0 ? ` (${openCount})` : ''}`}
+            </button>
+            <button className="wallet-btn-secondary" disabled={busy} onClick={handleStopForce}>
+              Force stop
             </button>
           </div>
 
@@ -768,8 +1027,100 @@ function AutoTradeTab({ traderRunning }: { traderRunning: boolean }): React.JSX.
               ))
             )}
           </div>
+
+          <PositionsPanel positions={positions} />
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Positions panel ──────────────────────────────────────────────────────────
+// Visual list of currently-held positions below the activity feed. Updated
+// every 3s from /api/auto/status. Each card shows entry price, age, TP/SL
+// targets, and a status pill (holding / selling / error).
+
+function fmtPrice(p: number | null | undefined): string {
+  if (!p || !Number.isFinite(p)) return '—'
+  if (p >= 0.01) return p.toFixed(6)
+  if (p >= 1e-6) return p.toExponential(3)
+  return p.toExponential(2)
+}
+
+function fmtAge(sec: number): string {
+  if (sec < 60) return `${Math.round(sec)}s`
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`
+  return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`
+}
+
+function shortMint(m: string): string {
+  return m.length > 14 ? `${m.slice(0, 6)}…${m.slice(-4)}` : m
+}
+
+function positionStatus(p: OpenPosition): { label: string; cls: string } {
+  if (p.last_error) return { label: 'error', cls: 'pos-status-error' }
+  if (p.sell_attempted) return { label: 'selling', cls: 'pos-status-selling' }
+  return { label: 'holding', cls: 'pos-status-holding' }
+}
+
+function PositionsPanel({ positions }: { positions: OpenPosition[] }): React.JSX.Element | null {
+  if (positions.length === 0) return null
+  return (
+    <div className="positions-panel">
+      <div className="trade-result-label">
+        OPEN POSITIONS · {positions.length}
+      </div>
+      <div className="positions-grid">
+        {positions.map((p) => {
+          const status = positionStatus(p)
+          const holdLeft = p.max_hold_time != null
+            ? Math.max(0, p.max_hold_time - p.age_sec)
+            : null
+          return (
+            <div key={p.mint} className="position-card">
+              <div className="position-head">
+                <span className="position-symbol">{p.symbol || shortMint(p.mint)}</span>
+                <span className={`position-status-pill ${status.cls}`}>{status.label}</span>
+              </div>
+              <div className="position-mint" title={p.mint}>{shortMint(p.mint)}</div>
+              <div className="position-row">
+                <span className="position-label">entry</span>
+                <span>{p.entry_sol.toFixed(4)} SOL</span>
+                <span className="position-faint">@ {fmtPrice(p.entry_price)}</span>
+              </div>
+              <div className="position-row">
+                <span className="position-label">age</span>
+                <span>{fmtAge(p.age_sec)}</span>
+                {holdLeft !== null && (
+                  <span className="position-faint">
+                    · {fmtAge(holdLeft)} until forced sell
+                  </span>
+                )}
+              </div>
+              <div className="position-targets">
+                {p.take_profit_price != null && (
+                  <span className="position-target tp">
+                    TP {fmtPrice(p.take_profit_price)}
+                  </span>
+                )}
+                {p.stop_loss_price != null && (
+                  <span className="position-target sl">
+                    SL {fmtPrice(p.stop_loss_price)}
+                  </span>
+                )}
+                {p.take_profit_price == null && p.stop_loss_price == null && p.max_hold_time == null && (
+                  <span className="position-faint">manual exit only</span>
+                )}
+              </div>
+              {p.last_error && (
+                <div className="position-error" title={p.last_error}>
+                  {p.last_error}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

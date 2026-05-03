@@ -34,10 +34,19 @@ export default function Wallet({ onLocked, onOpenChat, onOpenTrade }: Props): Re
   const [holdings, setHoldings] = useState<TokenHolding[]>([])
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [faucetUrl, setFaucetUrl] = useState<string | null>(null)
   const [draft, setDraft] = useState<SendDraft | null>(null)
   const [sendBusy, setSendBusy] = useState(false)
   const [sendResult, setSendResult] = useState<{ signature: string; explorerBase: string } | null>(null)
   const [addrCopied, setAddrCopied] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportPin, setExportPin] = useState('')
+  const [exportBusy, setExportBusy] = useState(false)
+  const [exportError, setExportError] = useState('')
+  const [exportedBase58, setExportedBase58] = useState<string | null>(null)
+  const [exportedArray, setExportedArray] = useState<number[] | null>(null)
+  const [exportFormat, setExportFormat] = useState<'base58' | 'array'>('base58')
+  const [exportCopied, setExportCopied] = useState(false)
 
   async function copyAddress(): Promise<void> {
     if (!status?.publicKey) return
@@ -85,13 +94,72 @@ export default function Wallet({ onLocked, onOpenChat, onOpenTrade }: Props): Re
 
   async function handleAirdrop(): Promise<void> {
     setError(null)
+    setFaucetUrl(null)
     try {
       // 0.5 SOL is far more likely to land than 1+ on the public faucet.
-      await window.api.wallet.airdrop(0.5)
-      await refresh()
+      const result = await window.api.wallet.airdrop(0.5)
+      if (result.ok) {
+        await refresh()
+      } else {
+        setError(result.error ?? 'airdrop failed')
+        if (result.code === 'DEVNET_FAUCET_RATE_LIMIT' && result.webFaucetUrl) {
+          setFaucetUrl(result.webFaucetUrl)
+        }
+      }
     } catch (e) {
       setError((e as Error).message)
     }
+  }
+
+  async function openWebFaucet(): Promise<void> {
+    if (!status?.publicKey) return
+    const url = faucetUrl ?? `https://faucet.solana.com/?walletAddress=${status.publicKey}&amount=0.5`
+    try { await window.api.copyText(status.publicKey) } catch { /* */ }
+    await window.api.openExternal(url)
+  }
+
+  function closeExport(): void {
+    setExportOpen(false)
+    setExportPin('')
+    setExportError('')
+    setExportedBase58(null)
+    setExportedArray(null)
+    setExportCopied(false)
+  }
+
+  async function handleExport(): Promise<void> {
+    if (!exportPin) return setExportError('PIN required')
+    setExportBusy(true)
+    setExportError('')
+    try {
+      const result = await window.api.wallet.exportPrivateKey(exportPin)
+      if (!result.ok) {
+        setExportError(result.error ?? 'Export failed')
+        setExportPin('')
+        return
+      }
+      setExportedBase58(result.base58 ?? null)
+      setExportedArray(result.array ?? null)
+      setExportPin('')
+    } catch (e) {
+      setExportError((e as Error).message)
+    } finally {
+      setExportBusy(false)
+    }
+  }
+
+  async function copyExported(): Promise<void> {
+    const text = exportFormat === 'base58'
+      ? exportedBase58 ?? ''
+      : JSON.stringify(exportedArray ?? [])
+    if (!text) return
+    try {
+      await window.api.copyText(text)
+    } catch {
+      try { await navigator.clipboard.writeText(text) } catch { /* */ }
+    }
+    setExportCopied(true)
+    setTimeout(() => setExportCopied(false), 1600)
   }
 
   async function handleLock(): Promise<void> {
@@ -160,9 +228,22 @@ export default function Wallet({ onLocked, onOpenChat, onOpenTrade }: Props): Re
         <div className="wallet-topbar-actions">
           <button className="wallet-btn-secondary wallet-btn-sm" onClick={onOpenChat}>Chat</button>
           <button className="wallet-btn-secondary wallet-btn-sm" onClick={onOpenTrade}>Trade</button>
+          <button
+            className="wallet-btn-secondary wallet-btn-sm"
+            onClick={() => setExportOpen(true)}
+          >
+            Export
+          </button>
           <button className="wallet-btn-secondary wallet-btn-sm" onClick={handleLock}>Lock</button>
         </div>
       </div>
+
+      {network === 'devnet' && (
+        <div className="trade-devnet-banner" style={{ margin: '0 0 4px' }}>
+          <strong>Devnet:</strong> only SOL/SPL transfers work here.
+          Jupiter swap, Pump.fun, and auto-trade need <em>mainnet</em> — toggle above when you&apos;re ready.
+        </div>
+      )}
 
       <div className="wallet-balance-card">
         <div className="wallet-balance-label">SOL BALANCE · {network}</div>
@@ -183,9 +264,14 @@ export default function Wallet({ onLocked, onOpenChat, onOpenTrade }: Props): Re
             {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
           {network === 'devnet' && (
-            <button className="wallet-btn-secondary" onClick={handleAirdrop}>
-              Airdrop 0.5 SOL
-            </button>
+            <>
+              <button className="wallet-btn-secondary" onClick={handleAirdrop}>
+                Airdrop 0.5 SOL
+              </button>
+              <button className="wallet-btn-secondary" onClick={openWebFaucet}>
+                Web faucet
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -210,7 +296,18 @@ export default function Wallet({ onLocked, onOpenChat, onOpenTrade }: Props): Re
         )}
       </div>
 
-      {error && <div className="wallet-error">{error}</div>}
+      {error && (
+        <div className="wallet-error">
+          {error}
+          {faucetUrl && (
+            <div style={{ marginTop: 8 }}>
+              <button className="wallet-btn-primary" onClick={openWebFaucet}>
+                Open web faucet (address copied)
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {sendResult && (
         <div className="wallet-toast wallet-toast-success">
@@ -223,6 +320,84 @@ export default function Wallet({ onLocked, onOpenChat, onOpenTrade }: Props): Re
             {SHORT(sendResult.signature, 10)}
           </a>
           <button className="wallet-btn-link" onClick={() => setSendResult(null)}>dismiss</button>
+        </div>
+      )}
+
+      {exportOpen && (
+        <div className="wallet-modal-backdrop" onClick={() => !exportBusy && closeExport()}>
+          <div className="wallet-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="wallet-modal-title">EXPORT PRIVATE KEY</div>
+
+            {!exportedBase58 ? (
+              <>
+                <p className="wallet-subtitle wallet-error" style={{ textAlign: 'left', margin: 0 }}>
+                  Anyone with this key can drain your wallet. Never paste it into a website,
+                  Telegram chat, Discord DM, or screenshot it. We require Touch ID + your wallet PIN.
+                </p>
+                <input
+                  className="wallet-input"
+                  type="password"
+                  placeholder="Wallet PIN"
+                  value={exportPin}
+                  onChange={(e) => { setExportPin(e.target.value); setExportError('') }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleExport()}
+                  autoFocus
+                />
+                {exportError && <p className="wallet-error">{exportError}</p>}
+                <div className="wallet-actions">
+                  <button
+                    className="wallet-btn-secondary"
+                    disabled={exportBusy}
+                    onClick={closeExport}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="wallet-btn-danger"
+                    disabled={exportBusy || exportPin.length < 4}
+                    onClick={handleExport}
+                  >
+                    {exportBusy ? 'Verifying…' : 'Reveal with Touch ID'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="wallet-subtitle" style={{ textAlign: 'left', margin: 0 }}>
+                  Private key revealed. This window will not retain it after close.
+                </p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className={`wallet-btn-secondary wallet-btn-sm ${exportFormat === 'base58' ? 'active' : ''}`}
+                    onClick={() => setExportFormat('base58')}
+                    style={{ opacity: exportFormat === 'base58' ? 1 : 0.5 }}
+                  >
+                    base58 (Solana CLI / Solflare)
+                  </button>
+                  <button
+                    className={`wallet-btn-secondary wallet-btn-sm ${exportFormat === 'array' ? 'active' : ''}`}
+                    onClick={() => setExportFormat('array')}
+                    style={{ opacity: exportFormat === 'array' ? 1 : 0.5 }}
+                  >
+                    byte array (Phantom)
+                  </button>
+                </div>
+                <pre className="trade-pre" style={{ maxHeight: 160, fontSize: 11 }}>
+                  {exportFormat === 'base58'
+                    ? exportedBase58
+                    : JSON.stringify(exportedArray)}
+                </pre>
+                <div className="wallet-actions">
+                  <button className="wallet-btn-secondary" onClick={copyExported}>
+                    {exportCopied ? 'Copied ✓' : 'Copy'}
+                  </button>
+                  <button className="wallet-btn-primary" onClick={closeExport}>
+                    Done
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 

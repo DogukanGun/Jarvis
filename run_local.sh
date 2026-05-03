@@ -168,6 +168,7 @@ export VISION_BASE_URL="http://localhost:8500"
 export CODE_ANALYZER_BASE_URL="http://localhost:8900"
 export SOLANA_TRADER_BASE_URL="http://localhost:8901"
 export SOLANA_STRATEGY_BASE_URL="http://localhost:8902"
+export LEGAL_RAG_BASE_URL="http://localhost:8903"
 export NEXT_PUBLIC_ROUTER_URL="http://localhost:8888"
 
 # =============================================================================
@@ -297,8 +298,24 @@ info "Starting code-analyzer..."
     > "$LOG_DIR/code-analyzer.log" 2>&1 &
 PIDS+=($!)
 
-# 9. Solana agents (deps only — Electron spawns the actual processes after
-#    wallet unlock so they can receive the loopback signer creds).
+# 9. Legal RAG
+DIR="$ROOT/agent/legal-rag"
+setup_venv "$DIR" "$DIR/requirements.txt"
+info "Starting legal-rag..."
+( cd "$DIR" && AGENT_ID=legal-rag PORT=8903 \
+    LEGAL_RAG_BASE_URL="$LEGAL_RAG_BASE_URL" \
+    OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
+    OPENAI_MODEL="${LEGAL_RAG_OPENAI_MODEL:-gpt-4o-mini}" \
+    ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
+    LLM_PROVIDER="${LLM_PROVIDER:-openai}" \
+    ENABLE_RERANKER="${LEGAL_RAG_ENABLE_RERANKER:-false}" \
+    BGE_MODEL="${LEGAL_RAG_BGE_MODEL:-BAAI/bge-m3}" \
+    "$DIR/.venv/bin/python" run_server.py ) \
+    > "$LOG_DIR/legal-rag.log" 2>&1 &
+PIDS+=($!)
+
+# 10. Solana agents (deps only — Electron spawns the actual processes after
+#     wallet unlock so they can receive the loopback signer creds).
 info "Bootstrapping Solana trader (npm install if needed)..."
 setup_node_deps "$ROOT/agent/solana-trader"
 
@@ -340,6 +357,7 @@ wait_for_port "router"           8888
 wait_for_port "swiss-army-knife" 8787
 wait_for_port "vision"           8500
 wait_for_port "code-analyzer"    8900
+wait_for_port "legal-rag"        8903
 
 # =============================================================================
 #  UI LAYER  (selected by --ui flag)
@@ -428,6 +446,7 @@ echo -e "  ${BOLD}Vision${NC}               ${CYAN}http://localhost:8500${NC}"
 echo -e "  ${BOLD}Code Analyzer${NC}        ${CYAN}http://localhost:8900${NC}"
 echo -e "  ${BOLD}Solana Trader${NC}        ${CYAN}http://localhost:8901${NC}  ${YELLOW}(Electron spawns after wallet unlock)${NC}"
 echo -e "  ${BOLD}Solana Strategy${NC}      ${CYAN}http://localhost:8902${NC}  ${YELLOW}(Electron spawns after wallet unlock)${NC}"
+echo -e "  ${BOLD}Legal RAG${NC}            ${CYAN}http://localhost:8903${NC}"
 echo -e "  ${BOLD}Kafka${NC}                ${CYAN}localhost:9094${NC}"
 echo -e "  ${BOLD}MinIO Console${NC}        ${CYAN}http://localhost:9001${NC}"
 echo ""

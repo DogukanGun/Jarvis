@@ -28,6 +28,7 @@ class RouterConfig:
     CODE_ANALYZER_BASE_URL = os.getenv("CODE_ANALYZER_BASE_URL", "http://localhost:8900")
     SOLANA_TRADER_BASE_URL = os.getenv("SOLANA_TRADER_BASE_URL", "http://localhost:8901")
     SOLANA_STRATEGY_BASE_URL = os.getenv("SOLANA_STRATEGY_BASE_URL", "http://localhost:8902")
+    LEGAL_RAG_BASE_URL = os.getenv("LEGAL_RAG_BASE_URL", "http://localhost:8903")
 
     # Security notification channels
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")

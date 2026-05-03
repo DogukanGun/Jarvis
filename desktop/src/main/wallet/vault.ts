@@ -2,7 +2,13 @@ import { app } from 'electron'
 import { Keypair } from '@solana/web3.js'
 import { mnemonicToSeedSync, generateMnemonic, validateMnemonic } from 'bip39'
 import { derivePath } from 'ed25519-hd-key'
-import bs58 from 'bs58'
+import bs58Module from 'bs58'
+
+// bs58 v6 ships as ESM; under Electron's CJS interop it lands as
+// `{ default: { encode, decode } }` instead of `{ encode, decode }`.
+// Resolve once defensively so both shapes work.
+const bs58 = ((bs58Module as unknown as { default?: typeof bs58Module }).default ??
+  bs58Module) as { encode: (b: Uint8Array) => string; decode: (s: string) => Uint8Array }
 import { join } from 'path'
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'fs'
 import {
@@ -165,6 +171,20 @@ export function verifyPin(pin: string): boolean {
     return true
   } catch {
     return false
+  }
+}
+
+// Decrypts the vault with the given PIN and returns the secret key in both
+// formats commonly needed by Solana wallets:
+//   base58: 88-char string (Solana CLI / Solflare / Backpack)
+//   array : 64-element Uint8Array (Phantom "Import Wallet" expects this)
+// Caller must have already biometric-gated this; PIN is required as a
+// second factor so an unlocked-but-unattended app can't leak the key.
+export function exportSecretKey(pin: string): { base58: string; array: number[] } {
+  const kp = unlockVault(pin)
+  return {
+    base58: bs58.encode(kp.secretKey),
+    array: Array.from(kp.secretKey),
   }
 }
 

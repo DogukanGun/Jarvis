@@ -138,6 +138,13 @@ export default function Chat({
   const [waiting, setWaiting] = useState(false)
   const [textInput, setTextInput] = useState('')
 
+  // Legal RAG panel state
+  const [legalTab, setLegalTab] = useState<'query' | 'docs'>('query')
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [ingestStatus, setIngestStatus] = useState<'idle' | 'uploading' | 'done' | 'failed'>('idle')
+  const [ingestProgress, setIngestProgress] = useState(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const toolLogEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -323,6 +330,30 @@ export default function Chat({
   )
 
   const { micState, supported, startListening, stopListening } = useSpeechRecognition(sendMessage)
+
+  const handleLegalUpload = useCallback(async () => {
+    if (!uploadFile) return
+    setIngestStatus('uploading')
+    setIngestProgress(0)
+    const formData = new FormData()
+    formData.append('file', uploadFile)
+    try {
+      const resp = await fetch('http://localhost:8903/api/ingest/pdf', { method: 'POST', body: formData })
+      if (!resp.ok) throw new Error(`Upload failed: ${resp.status}`)
+      const data = (await resp.json()) as { ingest_id: string }
+      const id = data.ingest_id
+      const poll = setInterval(async () => {
+        try {
+          const s = (await fetch(`http://localhost:8903/api/ingest/status/${id}`).then(r => r.json())) as { status: string; progress: number }
+          setIngestProgress(s.progress ?? 0)
+          if (s.status === 'done') { setIngestStatus('done'); clearInterval(poll) }
+          if (s.status === 'failed') { setIngestStatus('failed'); clearInterval(poll) }
+        } catch { /* strategy down */ }
+      }, 1500)
+    } catch {
+      setIngestStatus('failed')
+    }
+  }, [uploadFile])
 
   const submitText = useCallback(() => {
     const trimmed = textInput.trim()
@@ -542,6 +573,65 @@ export default function Chat({
               />
             </Panel>
           )}
+
+          {/* ── Legal RAG panel ── */}
+          <Panel label="LEGAL_RAG" accent="#a78bfa" className="legal-panel">
+            <div className="trade-tabs" style={{ margin: '6px 8px 0' }}>
+              <button
+                className={`trade-tab ${legalTab === 'query' ? 'active' : ''}`}
+                onClick={() => setLegalTab('query')}
+              >
+                QUERY
+              </button>
+              <button
+                className={`trade-tab ${legalTab === 'docs' ? 'active' : ''}`}
+                onClick={() => setLegalTab('docs')}
+              >
+                DOCS
+              </button>
+            </div>
+
+            {legalTab === 'query' && (
+              <div className="legal-hint">
+                Legal questions are auto-routed to the RAG agent. Just type in the chat.
+                <br />Examples: "What are the penalty provisions?", "Interpret Article 12."
+              </div>
+            )}
+
+            {legalTab === 'docs' && (
+              <div className="legal-upload">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.txt"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    setUploadFile(e.target.files?.[0] ?? null)
+                    setIngestStatus('idle')
+                  }}
+                />
+                <button
+                  className="legal-upload-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploadFile ? uploadFile.name : 'SELECT PDF / TXT'}
+                </button>
+                {uploadFile && ingestStatus !== 'done' && (
+                  <button
+                    className="legal-ingest-btn"
+                    onClick={handleLegalUpload}
+                    disabled={ingestStatus === 'uploading'}
+                  >
+                    {ingestStatus === 'uploading'
+                      ? `INGESTING ${Math.round(ingestProgress * 100)}%`
+                      : 'INGEST'}
+                  </button>
+                )}
+                {ingestStatus === 'done' && <span className="legal-status-ok">INDEXED ✓</span>}
+                {ingestStatus === 'failed' && <span className="legal-status-err">FAILED ✗</span>}
+              </div>
+            )}
+          </Panel>
 
           {/* ── Task windows ── */}
           {taskWindows.map((win) => (

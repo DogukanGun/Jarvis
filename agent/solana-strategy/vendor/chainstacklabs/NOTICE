@@ -1,0 +1,15 @@
+chainstacklabs/pumpfun-bonkfun-bot
+Source: https://github.com/chainstacklabs/pumpfun-bonkfun-bot
+License: Apache License 2.0 (see LICENSE in this directory)
+
+Files vendored from this project (with original module path):
+  - src/trading/position.py  →  vendor/chainstacklabs/trading/position.py
+
+Modifications (per Apache-2.0 §4):
+  - replaced `from solders.pubkey import Pubkey` with `str`-typed `mint`
+    field, since the rest of Jarvis treats mints as base58 strings and we
+    don't pull solders into solana-strategy. The exit-strategy semantics
+    (take_profit / stop_loss / max_hold_time / should_exit) are unchanged.
+
+This NOTICE is required by Apache-2.0 §4(d) to be redistributed alongside
+the vendored code.

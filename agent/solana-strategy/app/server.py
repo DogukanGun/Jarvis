@@ -18,6 +18,7 @@ from app.tools.strategy.indicator_signal import IndicatorSignalTool
 from app.tools.strategy.make_intent import MakeIntentTool
 from app.tools.strategy.copy_trade_watcher import CopyTradeWatcherTool
 from app.auto import runner as auto_runner
+from app.auto import watchdog as auto_watchdog
 from app.auto.events import bus
 
 logger = logging.getLogger(__name__)
@@ -98,7 +99,7 @@ class AutoStartRequest(BaseModel):
     policy_id: str = Field(..., min_length=8)
     max_trade_sol: float = Field(..., gt=0)
     total_budget_sol: float = Field(..., gt=0)
-    expires_at: float = Field(..., description="Unix epoch seconds")
+    expires_at: float = Field(..., description="Unix epoch seconds (24h safety cap)")
     interval_sec: int = Field(30, ge=5, le=600)
     watchlist: List[str] = Field(default_factory=list)
     target_wallets: List[str] = Field(default_factory=list)
@@ -106,6 +107,14 @@ class AutoStartRequest(BaseModel):
     rug_score_max: float = Field(0.5, ge=0, le=1.0)
     min_liquidity_sol: float = Field(5.0, ge=0)
     max_buy_sol: float = Field(0.01, gt=0)
+    # Exit strategy (chainstacklabs/pumpfun-bonkfun-bot semantics):
+    #   take_profit_pct: 0.5 = sell at +50%; null disables
+    #   stop_loss_pct:   0.3 = sell at -30%; null disables
+    #   max_hold_time:   60 = force sell after 60s; null disables
+    # First condition to fire wins.
+    take_profit_pct: float | None = Field(0.5, ge=0)
+    stop_loss_pct: float | None = Field(0.3, ge=0, le=1.0)
+    max_hold_time: int | None = Field(60, ge=5, le=86_400)
 
 
 @app.post("/api/auto/start")
@@ -132,6 +141,9 @@ async def auto_start(req: AutoStartRequest) -> Dict[str, Any]:
         rug_score_max=req.rug_score_max,
         min_liquidity_sol=req.min_liquidity_sol,
         max_buy_sol=req.max_buy_sol,
+        take_profit_pct=req.take_profit_pct,
+        stop_loss_pct=req.stop_loss_pct,
+        max_hold_time=req.max_hold_time,
     )
     await auto_runner.start(cfg)
     return {"ok": True, "strategy": req.strategy}
@@ -139,19 +151,63 @@ async def auto_start(req: AutoStartRequest) -> Dict[str, Any]:
 
 @app.post("/api/auto/stop")
 async def auto_stop() -> Dict[str, Any]:
+    """Hard stop — kills the runner immediately, leaves any held positions."""
     await auto_runner.stop()
+    return {"ok": True}
+
+
+@app.post("/api/auto/stop-graceful")
+async def auto_stop_graceful() -> Dict[str, Any]:
+    """No new buys; runner keeps ticking until all positions close, then exits."""
+    await auto_runner.stop_graceful()
+    return {"ok": True}
+
+
+class AutoResumeRequest(BaseModel):
+    policy_id: str = Field(..., min_length=8)
+
+
+@app.post("/api/auto/resume")
+async def auto_resume(req: AutoResumeRequest) -> Dict[str, Any]:
+    """Re-attach a fresh policy id after session-lost. Stuck positions retry."""
+    if not auto_runner.is_running():
+        raise HTTPException(409, "no active runner to resume")
+    ok = await auto_runner.resume_with_new_policy(req.policy_id)
+    if not ok:
+        raise HTTPException(409, "runner has no active config to resume")
     return {"ok": True}
 
 
 @app.get("/api/auto/status")
 async def auto_status() -> Dict[str, Any]:
     cfg = auto_runner.current_config()
+    age = auto_watchdog.last_heartbeat_age_sec()
     return {
         "running": auto_runner.is_running(),
         "strategy": cfg.strategy if cfg else None,
         "policy_id": cfg.policy_id if cfg else None,
         "expires_at": cfg.expires_at if cfg else None,
+        "open_positions": auto_runner.open_positions(),
+        # Watchdog + panic surface
+        "panic": auto_runner.is_panic(),
+        "panic_reason": auto_runner.panic_reason(),
+        "last_heartbeat_age_sec": None if age == float("inf") else age,
     }
+
+
+@app.post("/api/auto/heartbeat")
+async def auto_heartbeat() -> Dict[str, Any]:
+    """UI ping while the Auto-Trade tab is mounted. Keeps the watchdog quiet."""
+    auto_watchdog.heartbeat()
+    return {"ok": True}
+
+
+@app.post("/api/auto/panic")
+async def auto_panic() -> Dict[str, Any]:
+    """Trigger panic-sell now: drop TP/SL/hold-time gating and sell everything.
+    Used by the manual 🚨 button and the Electron `before-quit` hook."""
+    auto_runner.request_panic("manual-panic")
+    return {"ok": True}
 
 
 @app.get("/api/auto/events")

@@ -33,7 +33,7 @@ interface SessionPolicy {
 
 type SpawnState = 'not-installed' | 'spawning' | 'running' | 'crashed' | 'stopped'
 interface AgentStatus {
-  name: 'solana-trader' | 'solana-strategy'
+  name: 'solana-trader' | 'solana-strategy' | 'legal-rag'
   state: SpawnState
   port: number
   pid: number | null
@@ -42,24 +42,29 @@ interface AgentStatus {
   lastError: string | null
 }
 
+type AgentSnapshot = { trader: AgentStatus; strategy: AgentStatus; legalRag: AgentStatus }
+
 const agents = {
-  status: (): Promise<{ trader: AgentStatus; strategy: AgentStatus }> =>
+  status: (): Promise<AgentSnapshot> =>
     ipcRenderer.invoke('agents:status'),
   installTrader: (): Promise<{ ok: boolean; code: number | null }> =>
     ipcRenderer.invoke('agents:install-trader'),
   installStrategy: (): Promise<{ ok: boolean; code: number | null }> =>
     ipcRenderer.invoke('agents:install-strategy'),
-  restartTrader: (): Promise<{ trader: AgentStatus; strategy: AgentStatus }> =>
+  installLegalRag: (): Promise<{ ok: boolean; code: number | null }> =>
+    ipcRenderer.invoke('agents:install-legal-rag'),
+  restartTrader: (): Promise<AgentSnapshot> =>
     ipcRenderer.invoke('agents:restart-trader'),
-  restartStrategy: (): Promise<{ trader: AgentStatus; strategy: AgentStatus }> =>
+  restartStrategy: (): Promise<AgentSnapshot> =>
     ipcRenderer.invoke('agents:restart-strategy'),
-  startAll: (): Promise<{ trader: AgentStatus; strategy: AgentStatus }> =>
+  restartLegalRag: (): Promise<AgentSnapshot> =>
+    ipcRenderer.invoke('agents:restart-legal-rag'),
+  startAll: (): Promise<AgentSnapshot> =>
     ipcRenderer.invoke('agents:start-all'),
   onStatusChange: (
-    callback: (snapshot: { trader: AgentStatus; strategy: AgentStatus }) => void,
+    callback: (snapshot: AgentSnapshot) => void,
   ): (() => void) => {
-    const handler = (_e: unknown, snapshot: { trader: AgentStatus; strategy: AgentStatus }): void =>
-      callback(snapshot)
+    const handler = (_e: unknown, snapshot: AgentSnapshot): void => callback(snapshot)
     ipcRenderer.on('agents:status-changed', handler)
     return () => ipcRenderer.removeListener('agents:status-changed', handler)
   },
@@ -83,6 +88,10 @@ const wallet = {
   unlock: (pin: string): Promise<{ ok: boolean; publicKey?: string; error?: string }> =>
     ipcRenderer.invoke('wallet:unlock', pin),
   verifyPin: (pin: string): Promise<boolean> => ipcRenderer.invoke('wallet:verify-pin', pin),
+  exportPrivateKey: (
+    pin: string,
+  ): Promise<{ ok: boolean; base58?: string; array?: number[]; error?: string }> =>
+    ipcRenderer.invoke('wallet:export-private-key', pin),
   lock: (): Promise<boolean> => ipcRenderer.invoke('wallet:lock'),
   getConfig: (): Promise<{ network: Network; rpcUrl: string; explorerBase: string; autoLockSeconds: number }> =>
     ipcRenderer.invoke('wallet:get-config'),
@@ -103,7 +112,10 @@ const wallet = {
     }>
     network: Network
   }> => ipcRenderer.invoke('wallet:get-balance'),
-  airdrop: (sol: number): Promise<string> => ipcRenderer.invoke('wallet:airdrop', sol),
+  airdrop: (
+    sol: number,
+  ): Promise<{ ok: boolean; signature?: string; error?: string; code?: string; webFaucetUrl?: string }> =>
+    ipcRenderer.invoke('wallet:airdrop', sol),
   sendSol: (to: string, sol: number): Promise<{ signature: string; explorerBase: string }> =>
     ipcRenderer.invoke('wallet:send-sol', { to, sol }),
   sendSpl: (
@@ -128,6 +140,8 @@ const wallet = {
       return () => ipcRenderer.removeListener('wallet:session-changed', handler)
     },
   },
+  panicSell: (): Promise<{ ok: boolean; drained?: boolean; openCount?: number; waitedMs?: number; error?: string }> =>
+    ipcRenderer.invoke('wallet:panic-sell'),
 }
 
 const api = {
@@ -150,6 +164,7 @@ const api = {
   biometricAvailable: (): Promise<boolean> => ipcRenderer.invoke('biometric-available'),
   biometricVerify: (reason: string): Promise<boolean> => ipcRenderer.invoke('biometric-verify', reason),
   copyText: (text: string): Promise<boolean> => ipcRenderer.invoke('clipboard:write-text', text),
+  openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke('shell:open-external', url),
   wallet,
   agents,
 }

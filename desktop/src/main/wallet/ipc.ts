@@ -5,6 +5,7 @@ import {
   createVault,
   wipeVault,
   unlockVault,
+  exportSecretKey,
   type CreateMode,
 } from './vault'
 import {
@@ -29,8 +30,10 @@ import {
   getStatusSnapshot,
   installTrader,
   installStrategy,
+  installLegalRag,
   restartTrader,
   restartStrategy,
+  restartLegalRag,
   startAll,
 } from './agent-spawner'
 import {
@@ -110,6 +113,19 @@ export function registerWalletIpc(): void {
     }
   })
 
+  ipcMain.handle('wallet:export-private-key', async (_e, pin: string) => {
+    if (!pin) throw new Error('PIN required')
+    // Two-factor: Touch ID first (proves the laptop owner is present),
+    // then PIN-decrypt the vault (proves the PIN holder is present).
+    const ok = await biometricGate('Reveal Solana private key')
+    if (!ok) throw new Error('Biometric check failed')
+    try {
+      return { ok: true, ...exportSecretKey(pin) }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+
   ipcMain.handle('wallet:lock', () => {
     lock()
     return true
@@ -117,7 +133,23 @@ export function registerWalletIpc(): void {
 
   ipcMain.handle('wallet:get-config', () => loadConfig())
 
-  ipcMain.handle('wallet:set-config', (_e, patch: Partial<WalletConfig>) => saveConfig(patch))
+  ipcMain.handle('wallet:set-config', async (_e, patch: Partial<WalletConfig>) => {
+    const before = loadConfig()
+    const after = saveConfig(patch)
+    // Network or RPC URL changes invalidate the env baked into the running
+    // child processes. Respawn so they pick up the new RPC + NETWORK and the
+    // Trade page stops showing devnet warnings on mainnet.
+    const networkChanged = before.network !== after.network
+    const rpcChanged = before.rpcUrl !== after.rpcUrl
+    if ((networkChanged || rpcChanged) && isUnlocked()) {
+      // Kill any active auto-trade session — the policy was authorized for
+      // the previous network and shouldn't carry over.
+      endSession()
+      void restartTrader()
+      void restartStrategy()
+    }
+    return after
+  })
 
   ipcMain.handle('wallet:get-balance', async () => {
     const pub = getSignerPubkey() ?? getStoredPublicKey()
@@ -132,7 +164,18 @@ export function registerWalletIpc(): void {
   ipcMain.handle('wallet:airdrop', async (_e, sol: number) => {
     const pub = getSignerPubkey() ?? getStoredPublicKey()
     if (!pub) throw new Error('No wallet')
-    return airdropDevnetSol(pub, sol)
+    try {
+      const sig = await airdropDevnetSol(pub, sol)
+      return { ok: true, signature: sig }
+    } catch (e) {
+      const err = e as Error & { code?: string; webFaucetUrl?: string }
+      return {
+        ok: false,
+        error: err.message,
+        code: err.code,
+        webFaucetUrl: err.webFaucetUrl,
+      }
+    }
   })
 
   ipcMain.handle(
@@ -188,6 +231,19 @@ export function registerWalletIpc(): void {
     return getStatusSnapshot()
   })
 
+  ipcMain.handle('agents:install-legal-rag', async (event) => {
+    const sender = event.sender
+    const result = await installLegalRag((line) => {
+      if (!sender.isDestroyed()) sender.send('agents:install-log', line)
+    })
+    return result
+  })
+
+  ipcMain.handle('agents:restart-legal-rag', async () => {
+    await restartLegalRag()
+    return getStatusSnapshot()
+  })
+
   ipcMain.handle('agents:start-all', async () => {
     if (!isUnlocked()) throw new Error('Wallet is locked')
     await startAll()
@@ -195,10 +251,11 @@ export function registerWalletIpc(): void {
   })
 
   // ── Auto-trade session policy ────────────────────────────────────────────
-  // Lock-on-wallet-lock: ending the wallet lock kills the session.
-  onLockChange((unlocked) => {
-    if (!unlocked) endSession()
-  })
+  // NOTE: we deliberately do NOT end the session on wallet lock. Auto-lock
+  // is suppressed while a session is active (see signer.setAutoLockSuppressed),
+  // and a manual lock by the user is rare enough that we'd rather leave the
+  // policy intact and let the loopback's 423 response surface to the UI than
+  // silently nuke an in-flight session.
 
   ipcMain.handle('wallet:session-start', async (_e, input: SessionPolicyInput) => {
     if (!isUnlocked()) throw new Error('Wallet is locked')
@@ -215,5 +272,37 @@ export function registerWalletIpc(): void {
   ipcMain.handle('wallet:session-end', () => {
     endSession()
     return true
+  })
+
+  // Panic-sell — fire-and-wait. Posts to the strategy's /api/auto/panic and
+  // waits up to 30s for the runner to drain. Used by the 🚨 UI button and
+  // by the Electron `before-quit` hook so quitting the app doesn't leave
+  // bought tokens stuck on-chain.
+  ipcMain.handle('wallet:panic-sell', async () => {
+    const STRATEGY = 'http://127.0.0.1:8902'
+    const DEADLINE_MS = 30_000
+    let drained = false
+    let openCount = -1
+    try {
+      await fetch(`${STRATEGY}/api/auto/panic`, { method: 'POST' })
+    } catch (e) {
+      return { ok: false, error: `panic POST failed: ${(e as Error).message}` }
+    }
+    const start = Date.now()
+    while (Date.now() - start < DEADLINE_MS) {
+      try {
+        const r = await fetch(`${STRATEGY}/api/auto/status`)
+        if (r.ok) {
+          const j = (await r.json()) as { open_positions?: unknown[]; running?: boolean }
+          openCount = (j.open_positions ?? []).length
+          if (openCount === 0 || !j.running) {
+            drained = true
+            break
+          }
+        }
+      } catch { /* keep polling */ }
+      await new Promise((res) => setTimeout(res, 1000))
+    }
+    return { ok: true, drained, openCount, waitedMs: Date.now() - start }
   })
 }

@@ -4,6 +4,7 @@ import { loadConfig } from './config'
 
 let kp: Keypair | null = null
 let lockTimer: NodeJS.Timeout | null = null
+let autoLockSuppressed = false
 const listeners = new Set<(unlocked: boolean) => void>()
 
 function notify(unlocked: boolean): void {
@@ -14,9 +15,26 @@ function notify(unlocked: boolean): void {
 
 function resetAutoLock(): void {
   if (lockTimer) clearTimeout(lockTimer)
+  if (autoLockSuppressed) return
   const seconds = loadConfig().autoLockSeconds
   if (seconds <= 0) return
   lockTimer = setTimeout(() => lock(), seconds * 1000)
+}
+
+/** Pause/resume the inactivity-based auto-lock timer. Used by the auto-trade
+ *  session so the wallet doesn't lock mid-snipe-loop just because no manual
+ *  signing has happened in the last 30 minutes. Manual lock (user clicks
+ *  Lock, or app quits) still fires through `lock()`. */
+export function setAutoLockSuppressed(suppressed: boolean): void {
+  autoLockSuppressed = suppressed
+  if (suppressed) {
+    if (lockTimer) {
+      clearTimeout(lockTimer)
+      lockTimer = null
+    }
+  } else {
+    resetAutoLock()
+  }
 }
 
 export function isUnlocked(): boolean {

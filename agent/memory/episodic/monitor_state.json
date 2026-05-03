@@ -3,15 +3,15 @@
     "status": "idle",
     "graphs": {
       "main_graph": {
-        "runs": 8,
+        "runs": 26,
         "errors": 0,
-        "last_run": "2026-05-01T11:44:21.490+00:00",
+        "last_run": "2026-05-03T20:57:38.245+00:00",
         "active_node": null
       },
       "memory_write_graph": {
-        "runs": 8,
+        "runs": 26,
         "errors": 0,
-        "last_run": "2026-05-01T11:44:21.509+00:00",
+        "last_run": "2026-05-03T20:57:38.269+00:00",
         "active_node": null
       },
       "reflection_graph": {
@@ -28,15 +28,15 @@
       }
     },
     "metrics": {
-      "total_episodes": 8,
+      "total_episodes": 20,
       "total_promotions": 0,
       "total_rejections": 0,
       "total_reflections": 0,
-      "total_searches": 8,
-      "avg_write_latency_ms": 8.2,
+      "total_searches": 26,
+      "avg_write_latency_ms": 11.2,
       "avg_search_latency_ms": 0,
-      "dedup_hit_count": 0,
-      "dedup_total_count": 0,
+      "dedup_hit_count": 6,
+      "dedup_total_count": 6,
       "secrets_redacted": 0
     },
     "services": {
@@ -446,7 +446,883 @@
       "type": "write_completed",
       "timestamp": "2026-05-01T11:44:21.516+00:00",
       "latency_ms": 6
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-02T16:32:48.184+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-02T16:32:48.260+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 4,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-02T16:32:48.264+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-02T16:32:48.264+00:00",
+      "graph": "main_graph",
+      "duration_ms": 73
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-02T16:32:48.271+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "5188f3d1-50ce-4264-b1a4-c7e292496d0b",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-02T16:32:48.287+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 21
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-02T16:32:48.287+00:00",
+      "latency_ms": 21
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-02T16:32:50.499+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-02T16:32:50.516+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 4,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-02T16:32:50.518+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-02T16:32:50.518+00:00",
+      "graph": "main_graph",
+      "duration_ms": 18
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-02T16:32:50.521+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "de2707bd-d695-43c4-ad60-6239e2294e48",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-02T16:32:50.526+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 7
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-02T16:32:50.526+00:00",
+      "latency_ms": 7
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-02T16:32:56.831+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-02T16:32:56.853+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 5,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-02T16:32:56.854+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-02T16:32:56.855+00:00",
+      "graph": "main_graph",
+      "duration_ms": 24
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-02T16:32:56.861+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "8edc845c-b1fa-452e-8657-1da34e529458",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-02T16:32:56.881+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 25
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-02T16:32:56.881+00:00",
+      "latency_ms": 25
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-02T16:33:11.989+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-02T16:33:12.051+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 5,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-02T16:33:12.054+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-02T16:33:12.055+00:00",
+      "graph": "main_graph",
+      "duration_ms": 60
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-02T16:33:12.059+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "c5b74fbd-8462-4dc3-b370-daa4cbb62af3",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-02T16:33:12.070+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 14
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-02T16:33:12.070+00:00",
+      "latency_ms": 14
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:25:59.231+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-03T13:25:59.284+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 5,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:25:59.288+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:25:59.291+00:00",
+      "graph": "main_graph",
+      "duration_ms": 56
+    },
+    {
+      "type": "episode_deduplicated",
+      "timestamp": "2026-05-03T13:25:59.293+00:00",
+      "graph": "memory_write_graph",
+      "node": "dedupe_lookup",
+      "existing_episode_id": "0ba3738b-1dd0-4122-85a7-a5cbcbca2329",
+      "reinforcement_count": 1
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:25:59.308+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 19
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-03T13:25:59.308+00:00",
+      "latency_ms": 19
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:26:00.628+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-03T13:26:00.648+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 5,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:26:00.653+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:26:00.653+00:00",
+      "graph": "main_graph",
+      "duration_ms": 24
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-03T13:26:00.657+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "64700489-1c6f-4494-9c37-51281a39c92a",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:26:00.661+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 7
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-03T13:26:00.661+00:00",
+      "latency_ms": 7
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:34:31.640+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-03T13:34:31.675+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 5,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:34:31.677+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:34:31.678+00:00",
+      "graph": "main_graph",
+      "duration_ms": 36
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-03T13:34:31.683+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "fbc95255-23fa-4e90-adfe-7521b4fdcd18",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:34:31.690+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 12
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-03T13:34:31.691+00:00",
+      "latency_ms": 12
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:36:33.183+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-03T13:36:33.218+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 5,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:36:33.221+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:36:33.221+00:00",
+      "graph": "main_graph",
+      "duration_ms": 29
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-03T13:36:33.224+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "8db57987-72bb-4c1a-aa73-866cdb7ad14f",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:36:33.232+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 10
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-03T13:36:33.232+00:00",
+      "latency_ms": 10
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:40:17.341+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-03T13:40:17.360+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 5,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:40:17.361+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:40:17.363+00:00",
+      "graph": "main_graph",
+      "duration_ms": 20
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-03T13:40:17.366+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "3331ba74-d83f-4c37-89b8-ee10c841f579",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:40:17.370+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 8
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-03T13:40:17.371+00:00",
+      "latency_ms": 8
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:40:18.517+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-03T13:40:18.533+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 0,
+      "sources": []
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:40:18.534+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:40:18.534+00:00",
+      "graph": "main_graph",
+      "duration_ms": 16
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-03T13:40:18.537+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "cb5ee074-1602-440c-bb9d-1e954e54c251",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:40:18.540+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 4
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-03T13:40:18.540+00:00",
+      "latency_ms": 4
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:43:04.204+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-03T13:43:04.228+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 4,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:43:04.230+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:43:04.231+00:00",
+      "graph": "main_graph",
+      "duration_ms": 24
+    },
+    {
+      "type": "episode_deduplicated",
+      "timestamp": "2026-05-03T13:43:04.233+00:00",
+      "graph": "memory_write_graph",
+      "node": "dedupe_lookup",
+      "existing_episode_id": "3331ba74-d83f-4c37-89b8-ee10c841f579",
+      "reinforcement_count": 1
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:43:04.246+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 15
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-03T13:43:04.247+00:00",
+      "latency_ms": 15
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:43:07.985+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-03T13:43:08.002+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 4,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T13:43:08.004+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:43:08.004+00:00",
+      "graph": "main_graph",
+      "duration_ms": 18
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-03T13:43:08.007+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "73b77842-a19c-40b4-a5d7-7ec3ced9569b",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T13:43:08.010+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 5
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-03T13:43:08.010+00:00",
+      "latency_ms": 5
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T20:49:57.948+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-03T20:49:58.012+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 3,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T20:49:58.018+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T20:49:58.018+00:00",
+      "graph": "main_graph",
+      "duration_ms": 67
+    },
+    {
+      "type": "episode_deduplicated",
+      "timestamp": "2026-05-03T20:49:58.023+00:00",
+      "graph": "memory_write_graph",
+      "node": "dedupe_lookup",
+      "existing_episode_id": "fbc95255-23fa-4e90-adfe-7521b4fdcd18",
+      "reinforcement_count": 1
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T20:49:58.047+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 28
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-03T20:49:58.048+00:00",
+      "latency_ms": 28
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T20:50:02.555+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-03T20:50:02.571+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 3,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T20:50:02.573+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T20:50:02.573+00:00",
+      "graph": "main_graph",
+      "duration_ms": 17
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-03T20:50:02.579+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "363d4e91-07d7-4297-89ad-5692c7d6374d",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T20:50:02.584+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 9
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-03T20:50:02.584+00:00",
+      "latency_ms": 9
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T20:53:03.198+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-03T20:53:03.224+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 2,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T20:53:03.227+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T20:53:03.227+00:00",
+      "graph": "main_graph",
+      "duration_ms": 28
+    },
+    {
+      "type": "episode_inserted",
+      "timestamp": "2026-05-03T20:53:03.232+00:00",
+      "graph": "memory_write_graph",
+      "node": "insert_episode",
+      "episode_id": "bf9c92b0-4b40-47a9-8440-64e8c9f4804c",
+      "user_id": "admin",
+      "episode_type": "interaction"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T20:53:03.240+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 11
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-03T20:53:03.240+00:00",
+      "latency_ms": 11
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T20:53:11.141+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-03T20:53:11.158+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 1,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T20:53:11.161+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T20:53:11.161+00:00",
+      "graph": "main_graph",
+      "duration_ms": 19
+    },
+    {
+      "type": "episode_deduplicated",
+      "timestamp": "2026-05-03T20:53:11.164+00:00",
+      "graph": "memory_write_graph",
+      "node": "dedupe_lookup",
+      "existing_episode_id": "cb5ee074-1602-440c-bb9d-1e954e54c251",
+      "reinforcement_count": 1
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T20:53:11.169+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 7
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-03T20:53:11.170+00:00",
+      "latency_ms": 7
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T20:57:26.711+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-03T20:57:26.739+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 1,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T20:57:26.744+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T20:57:26.744+00:00",
+      "graph": "main_graph",
+      "duration_ms": 32
+    },
+    {
+      "type": "episode_deduplicated",
+      "timestamp": "2026-05-03T20:57:26.750+00:00",
+      "graph": "memory_write_graph",
+      "node": "dedupe_lookup",
+      "existing_episode_id": "cb5ee074-1602-440c-bb9d-1e954e54c251",
+      "reinforcement_count": 2
+    },
+    {
+      "type": "promotion_proposed",
+      "timestamp": "2026-05-03T20:57:26.758+00:00",
+      "graph": "memory_write_graph",
+      "node": "create_promotion_proposal",
+      "proposal_id": "de2e2282-ef3b-46bb-9ead-15f30de84d3a",
+      "episode_id": "cb5ee074-1602-440c-bb9d-1e954e54c251",
+      "user_id": "admin",
+      "confidence": 1.0
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T20:57:26.759+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 14
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-03T20:57:26.760+00:00",
+      "latency_ms": 14
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T20:57:38.245+00:00",
+      "graph": "main_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "search_executed",
+      "timestamp": "2026-05-03T20:57:38.267+00:00",
+      "graph": "main_graph",
+      "node": "retrieve_episodes",
+      "result_count": 1,
+      "sources": [
+        "sqlite"
+      ]
+    },
+    {
+      "type": "graph_run_start",
+      "timestamp": "2026-05-03T20:57:38.269+00:00",
+      "graph": "memory_write_graph",
+      "user_id": "admin"
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T20:57:38.270+00:00",
+      "graph": "main_graph",
+      "duration_ms": 23
+    },
+    {
+      "type": "episode_deduplicated",
+      "timestamp": "2026-05-03T20:57:38.273+00:00",
+      "graph": "memory_write_graph",
+      "node": "dedupe_lookup",
+      "existing_episode_id": "cb5ee074-1602-440c-bb9d-1e954e54c251",
+      "reinforcement_count": 3
+    },
+    {
+      "type": "promotion_proposed",
+      "timestamp": "2026-05-03T20:57:38.280+00:00",
+      "graph": "memory_write_graph",
+      "node": "create_promotion_proposal",
+      "proposal_id": "d422ccf6-7849-4b1f-88b2-3df8bd811ece",
+      "episode_id": "cb5ee074-1602-440c-bb9d-1e954e54c251",
+      "user_id": "admin",
+      "confidence": 1.0
+    },
+    {
+      "type": "graph_run_end",
+      "timestamp": "2026-05-03T20:57:38.282+00:00",
+      "graph": "memory_write_graph",
+      "duration_ms": 10
+    },
+    {
+      "type": "write_completed",
+      "timestamp": "2026-05-03T20:57:38.283+00:00",
+      "latency_ms": 10
     }
   ],
-  "saved_at": "2026-05-01T11:44:21.516+00:00"
+  "saved_at": "2026-05-03T20:57:38.283+00:00"
 }

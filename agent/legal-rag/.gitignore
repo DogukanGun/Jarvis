@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Runtime artifacts — regenerated on every ingest, embedder-version-specific
+data/*.pkl
+data/*.index
+data/*.index.*
+data/*.gpickle
+
+# Local env overrides
+.env
+.env.local

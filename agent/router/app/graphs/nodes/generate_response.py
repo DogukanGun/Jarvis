@@ -168,6 +168,31 @@ def generate_response(state: RouterGraphState) -> Dict[str, Any]:
             header = f"**{title}** ({url})\n\n" if title else f"**{url}**\n\n"
             return {"response": header + content[:3000]}
 
+    # For legal RAG: pass through the agent's formatted response with citation footer
+    lr_result = tool_results.get("legal_rag", {})
+    if intent == "legal_rag" and lr_result:
+        if lr_result.get("error"):
+            return {"response": f"Legal RAG error: {lr_result['error']}"}
+        if lr_result.get("response"):
+            citations = lr_result.get("citations", [])
+            citation_footer = ""
+            if citations:
+                citation_footer = "\n\n---\n**Sources:**\n"
+                for i, c in enumerate(citations[:5], 1):
+                    source = c.get("source", "") if isinstance(c, dict) else getattr(c, "source", "")
+                    section = c.get("section", "") if isinstance(c, dict) else getattr(c, "section", "")
+                    citation_footer += f"{i}. {source}"
+                    if section:
+                        citation_footer += f" — {section}"
+                    citation_footer += "\n"
+            sub_tools = lr_result.get("tools_used", [])
+            current_tools = state.get("tools_used", [])
+            merged_tools = current_tools + [t for t in sub_tools if t not in current_tools]
+            return {
+                "response": lr_result["response"] + citation_footer,
+                "tools_used": merged_tools,
+            }
+
     # For code analysis: pass through the agent's formatted response directly
     ca_result = tool_results.get("code_analyzer", {})
     if intent == "code_analysis" and ca_result:

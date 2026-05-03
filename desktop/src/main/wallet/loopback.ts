@@ -14,6 +14,13 @@ import {
 let server: Server | null = null
 let token: string | null = null
 let port: number | null = null
+// Serialize concurrent startLoopback() calls. Without this, both the
+// loopback's own onLockChange listener and the agent-spawner's onLockChange
+// listener fire on the same unlock event and both call startLoopback().
+// The second caller used to see `server` non-null but `port` not yet bound,
+// and getLoopbackInfo() would throw "Loopback not running" — surfaced as an
+// UnhandledPromiseRejectionWarning at app startup.
+let bindingPromise: Promise<LoopbackInfo> | null = null
 
 function readBody(req: import('http').IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -62,9 +69,21 @@ export interface LoopbackInfo {
 }
 
 export async function startLoopback(): Promise<LoopbackInfo> {
-  if (server) return getLoopbackInfo()
+  // Already fully bound — return immediately.
+  if (server && token && port) return getLoopbackInfo()
+  // Bind in progress — share the same promise.
+  if (bindingPromise) return bindingPromise
   if (!isUnlocked()) throw new Error('Wallet must be unlocked before starting loopback')
 
+  bindingPromise = doStart()
+  try {
+    return await bindingPromise
+  } finally {
+    bindingPromise = null
+  }
+}
+
+async function doStart(): Promise<LoopbackInfo> {
   token = randomBytes(32).toString('base64url')
 
   server = createServer(async (req, res) => {
@@ -104,7 +123,7 @@ export async function startLoopback(): Promise<LoopbackInfo> {
           }
           const tx = deserializeTx(body.tx)
           signTransaction(tx)
-          recordSpend(body.claim.lamportsOut)
+          recordSpend(body.claim.lamportsOut, body.claim.action)
           reply(res, 200, { tx: serializeTx(tx), session: getActiveSession() })
           return
         }
@@ -136,7 +155,7 @@ export async function startLoopback(): Promise<LoopbackInfo> {
           const signed = body.txs.map((t, i) => {
             const tx = deserializeTx(t)
             signTransaction(tx)
-            recordSpend(body.claims![i].lamportsOut)
+            recordSpend(body.claims![i].lamportsOut, body.claims![i].action)
             return serializeTx(tx)
           })
           reply(res, 200, { txs: signed, session: getActiveSession() })

@@ -18,6 +18,7 @@ from .nodes import (
     invoke_code_analyzer,
     invoke_solana_trader,
     invoke_solana_strategy,
+    invoke_legal_rag,
     generate_response,
     write_memory,
 )
@@ -42,6 +43,8 @@ def _intent_router(state: RouterGraphState) -> str:
         return "solana_trade"
     elif intent == "solana_strategy":
         return "solana_strategy"
+    elif intent == "legal_rag":
+        return "legal_rag"
     else:
         return "chat"
 
@@ -74,6 +77,7 @@ def create_router_graph():
     graph.add_node("invoke_code_analyzer", invoke_code_analyzer)
     graph.add_node("invoke_solana_trader", invoke_solana_trader)
     graph.add_node("invoke_solana_strategy", invoke_solana_strategy)
+    graph.add_node("invoke_legal_rag", invoke_legal_rag)
     graph.add_node("generate_response", generate_response)
     # write_memory is intentionally NOT in the graph — it is fired as a
     # background task in server.py after the WebSocket response is sent,
@@ -98,6 +102,7 @@ def create_router_graph():
             "code_analysis": "invoke_code_analyzer",
             "solana_trade": "invoke_solana_trader",
             "solana_strategy": "invoke_solana_strategy",
+            "legal_rag": "invoke_legal_rag",
         },
     )
 
@@ -108,6 +113,7 @@ def create_router_graph():
     graph.add_edge("invoke_code_analyzer", "generate_response")
     graph.add_edge("invoke_solana_trader", "generate_response")
     graph.add_edge("invoke_solana_strategy", "generate_response")
+    graph.add_edge("invoke_legal_rag", "generate_response")
 
     # Response -> END (write_memory happens async in server.py)
     graph.add_edge("generate_response", END)

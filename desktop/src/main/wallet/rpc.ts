@@ -144,25 +144,35 @@ export async function sendSpl(
   return sendAndConfirmTransaction(conn, tx, [signer], { commitment: 'confirmed' })
 }
 
-// The public devnet RPC frequently returns "Internal error" for airdrops.
-// We try the configured RPC first, then fall through to a small list of
-// alternative endpoints. Final failure points the user at the web faucet.
+// `api.devnet.solana.com` is effectively the only public RPC that exposes
+// `requestAirdrop` without an API key — and it's heavily rate-limited.
+// PublicNode returns 404 for requestAirdrop; Ankr started requiring keys.
+// On failure we surface a "Open web faucet" button (faucet.solana.com),
+// which is the only reliable path when the public RPC is throttled.
 const DEVNET_AIRDROP_FALLBACKS = [
   'https://api.devnet.solana.com',
-  'https://devnet.helius-rpc.com',
 ]
 
 async function tryAirdropOnce(rpcUrl: string, pubkey: PublicKey, lamports: number): Promise<string> {
   const conn = new Connection(rpcUrl, 'confirmed')
-  const sig = await conn.requestAirdrop(pubkey, lamports)
-  // Some endpoints return a sig but don't index it on the same node — confirm
-  // separately and let it throw if confirmation never lands.
-  const latest = await conn.getLatestBlockhash('confirmed')
-  await conn.confirmTransaction(
-    { signature: sig, blockhash: latest.blockhash, lastValidBlockHeight: latest.lastValidBlockHeight },
-    'confirmed',
-  )
-  return sig
+  // Two retries with backoff on the same endpoint — the public faucet
+  // sometimes returns "Internal error" once and then succeeds.
+  let lastErr: Error | null = null
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const sig = await conn.requestAirdrop(pubkey, lamports)
+      const latest = await conn.getLatestBlockhash('confirmed')
+      await conn.confirmTransaction(
+        { signature: sig, blockhash: latest.blockhash, lastValidBlockHeight: latest.lastValidBlockHeight },
+        'confirmed',
+      )
+      return sig
+    } catch (e) {
+      lastErr = e as Error
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 1500))
+    }
+  }
+  throw lastErr ?? new Error('airdrop failed')
 }
 
 export async function airdropDevnetSol(pubkey: string, sol: number): Promise<string> {
@@ -180,14 +190,15 @@ export async function airdropDevnetSol(pubkey: string, sol: number): Promise<str
     } catch (err) {
       const msg = (err as Error).message || String(err)
       errors.push(`${new URL(url).host}: ${msg}`)
-      // brief pause before next endpoint
-      await new Promise((r) => setTimeout(r, 600))
     }
   }
 
-  throw new Error(
-    'Public devnet faucet is rate-limited or down right now. ' +
-      `Try the web faucet at https://faucet.solana.com (paste your address: ${pubkey}). ` +
-      `Tried: ${errors.join(' | ')}`,
-  )
+  // Public RPC is rate-limited. The renderer renders an "Open web faucet"
+  // button when it sees the structured `code` below.
+  const err = new Error(
+    `Public devnet faucet is rate-limited. Use the web faucet at https://faucet.solana.com instead. Tried: ${errors.join(' | ')}`,
+  ) as Error & { code?: string; webFaucetUrl?: string }
+  err.code = 'DEVNET_FAUCET_RATE_LIMIT'
+  err.webFaucetUrl = `https://faucet.solana.com/?walletAddress=${pubkey}&amount=${sol}`
+  throw err
 }

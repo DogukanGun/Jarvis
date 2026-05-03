@@ -10,6 +10,7 @@ from .process_visual import process_visual
 from .invoke_code_analyzer import invoke_code_analyzer
 from .invoke_solana_trader import invoke_solana_trader
 from .invoke_solana_strategy import invoke_solana_strategy
+from .invoke_legal_rag import invoke_legal_rag
 
 __all__ = [
     "retrieve_memory",
@@ -21,6 +22,7 @@ __all__ = [
     "invoke_code_analyzer",
     "invoke_solana_trader",
     "invoke_solana_strategy",
+    "invoke_legal_rag",
     "generate_response",
     "write_memory",
     "process_visual",
