@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a0a0a;
+  --fg: #f0f0f0;
+  --accent: #4ade80;
+  --accent-dim: rgba(74, 222, 128, 0.12);
+  --border: rgba(74, 222, 128, 0.15);
+  --muted: #555;
+}
+
+html {
+  background: #0a0a0a;
+  color: #f0f0f0;
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background: rgba(74, 222, 128, 0.25);
+}
+
+/* ── Keyframes ── */
+
+@keyframes dotGrid {
+  0%   { background-position: 0 0; }
+  100% { background-position: 40px 40px; }
+}
+
+@keyframes glowPulse {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(74, 222, 128, 0.35)); }
+  50%       { filter: drop-shadow(0 0 22px rgba(74, 222, 128, 0.85)); }
+}
+
+@keyframes chevronBounce {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(8px); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes ringPulse {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50%       { opacity: 0.6;  transform: scale(1.04); }
+}
+
+/* ── Utility classes ── */
+
+.animate-dot-grid {
+  animation: dotGrid 24s linear infinite;
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+.animate-chevron {
+  animation: chevronBounce 2s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spinSlow 22s linear infinite;
+}
+
+.animate-ring-pulse {
+  animation: ringPulse 3s ease-in-out infinite;
+}

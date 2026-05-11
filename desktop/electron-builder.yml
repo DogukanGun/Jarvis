@@ -1,7 +1,10 @@
-appId: com.electron.app
-productName: desktop2
+appId: com.jarvis.app
+productName: Jarvis
+copyright: Copyright © 2025 Jarvis
+
 directories:
   buildResources: build
+
 files:
   - '!**/.vscode/*'
   - '!src/*'
@@ -9,35 +12,78 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+
+# Agent source files bundled read-only in resources.
+# agentWorkDir() in agent-spawner.ts mirrors them to userData on first launch
+# so pip install / npm install can write .venv / node_modules there.
+extraResources:
+  - from: '../agent/solana-trader'
+    to: 'agent/solana-trader'
+    filter:
+      - '**/*'
+      - '!node_modules/**'
+      - '!dist/**'
+      - '!**/__pycache__/**'
+      - '!**/*.pyc'
+  - from: '../agent/solana-strategy'
+    to: 'agent/solana-strategy'
+    filter:
+      - '**/*'
+      - '!.venv/**'
+      - '!**/__pycache__/**'
+      - '!**/*.pyc'
+      - '!**/*.db'
+  - from: '../agent/legal-rag'
+    to: 'agent/legal-rag'
+    filter:
+      - '**/*'
+      - '!.venv/**'
+      - '!**/__pycache__/**'
+      - '!**/*.pyc'
+      - '!**/*.db'
+      - '!data/*.pkl'
+      - '!data/*.index'
+      - '!data/*.gpickle'
+
 asarUnpack:
   - resources/**
-win:
-  executableName: desktop2
-nsis:
-  artifactName: ${name}-${version}-setup.${ext}
-  shortcutName: ${productName}
-  uninstallDisplayName: ${productName}
-  createDesktopShortcut: always
+
 mac:
+  icon: build/icon.png
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
-    - NSCameraUsageDescription: Application requests access to the device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
-    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
-    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
+    - NSCameraUsageDescription: Jarvis uses the camera for Guard Mode visual monitoring.
+    - NSMicrophoneUsageDescription: Jarvis uses the microphone for voice commands.
+    - NSDocumentsFolderUsageDescription: Jarvis may read documents for the Legal RAG agent.
+    - NSDownloadsFolderUsageDescription: Jarvis may save files to your Downloads folder.
   notarize: false
+
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: Jarvis-${version}.${ext}
+
+win:
+  icon: build/icon.png
+  executableName: Jarvis
+
+nsis:
+  artifactName: Jarvis-${version}-setup.${ext}
+  shortcutName: Jarvis
+  uninstallDisplayName: Jarvis
+  createDesktopShortcut: always
+
 linux:
+  icon: build/icon.png
   target:
     - AppImage
-    - snap
     - deb
-  maintainer: electronjs.org
+  maintainer: jarvis@example.com
   category: Utility
+
 appImage:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: Jarvis-${version}.${ext}
+
+deb:
+  artifactName: Jarvis-${version}.${ext}
+
 npmRebuild: false
-publish:
-  provider: generic
-  url: https://example.com/auto-updates
+publish: null

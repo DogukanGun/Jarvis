@@ -2020,3 +2020,110 @@ body,
   padding: 1px 5px;
   margin-bottom: 4px;
 }
+
+/* ── Branded Welcome Screen (VisualCheck) ─────────────────────────────────── */
+
+@keyframes welcome-fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.85); }
+  50%       { opacity: 1;   transform: scale(1.15); }
+}
+
+.welcome-logo {
+  width: 72px;
+  height: 72px;
+  animation: welcome-fade-up 0.5s ease-out both;
+}
+
+.welcome-title {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  color: #f0f0f0;
+  text-transform: uppercase;
+  animation: welcome-fade-up 0.5s ease-out 0.1s both;
+  margin: 0;
+}
+
+.welcome-tagline {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: #4a4a4a;
+  text-transform: uppercase;
+  animation: welcome-fade-up 0.5s ease-out 0.2s both;
+}
+
+.welcome-divider {
+  width: 80px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(74,222,128,0.5), transparent);
+  margin: 4px 0;
+  animation: welcome-fade-up 0.5s ease-out 0.35s both;
+}
+
+.welcome-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: welcome-fade-up 0.5s ease-out 0.45s both;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+.status-dot.checking,
+.status-dot.verifying {
+  background: #f59e0b;
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+.status-dot.verified   { background: #4ade80; }
+.status-dot.error      { background: #f87171; }
+.status-dot.unavailable { background: #444; }
+
+.retry-btn {
+  background: transparent;
+  border: 1px solid rgba(248,113,113,0.35);
+  color: #f87171;
+  padding: 8px 22px;
+  border-radius: 6px;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.15s;
+  animation: welcome-fade-up 0.3s ease-out both;
+}
+.retry-btn:hover {
+  background: rgba(248,113,113,0.08);
+  border-color: #f87171;
+}
+
+/* ── Brand Header (WalletSetup / WalletUnlock) ────────────────────────────── */
+
+.brand-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.brand-header-logo {
+  width: 28px;
+  height: 28px;
+}
+
+.brand-header-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  color: #4ade80;
+  text-transform: uppercase;
+}

@@ -1,4 +1,14 @@
 import { useEffect, useState } from 'react'
+import jarvisLogo from '../assets/jarvis-logo.svg'
+
+function BrandHeader(): React.JSX.Element {
+  return (
+    <div className="brand-header">
+      <img src={jarvisLogo} alt="" className="brand-header-logo" />
+      <span className="brand-header-title">JARVIS</span>
+    </div>
+  )
+}
 
 interface Props {
   onUnlocked: () => void
@@ -48,6 +58,7 @@ export default function WalletUnlock({ onUnlocked, onWipe }: Props): React.JSX.E
 
   return (
     <div className="wallet-setup">
+      <BrandHeader />
       <h2 className="wallet-title">UNLOCK WALLET</h2>
       {publicKey && (
         <p className="wallet-subtitle">

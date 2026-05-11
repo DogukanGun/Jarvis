@@ -1,10 +1,9 @@
 {
-  "name": "desktop2",
+  "name": "jarvis-desktop",
   "version": "1.0.0",
-  "description": "An Electron application with React and TypeScript",
+  "description": "Jarvis — AI-powered Solana trading desktop",
   "main": "./out/main/index.js",
-  "author": "example.com",
-  "homepage": "https://electron-vite.org",
+  "author": "Jarvis Team",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
@@ -18,7 +17,10 @@
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "electron-vite build && electron-builder --mac",
-    "build:linux": "electron-vite build && electron-builder --linux"
+    "build:mac:arm64": "electron-vite build && electron-builder --mac --arm64",
+    "build:mac:universal": "electron-vite build && electron-builder --mac --universal",
+    "build:linux": "electron-vite build && electron-builder --linux",
+    "build:all": "npm run build:mac && npm run build:win && npm run build:linux"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",

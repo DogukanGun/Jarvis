@@ -1,8 +1,8 @@
 import { spawn, type ChildProcess } from 'child_process'
-import { existsSync, mkdirSync, openSync } from 'fs'
+import { cpSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { app, BrowserWindow } from 'electron'
-import { startLoopback, stopLoopback, getLoopbackInfo, isLoopbackRunning } from './loopback'
+import { startLoopback, getLoopbackInfo, isLoopbackRunning } from './loopback'
 import { onLockChange } from './signer'
 import { loadConfig } from './config'
 
@@ -65,17 +65,55 @@ function maybeAutoRestart(name: 'solana-trader' | 'solana-strategy' | 'legal-rag
   }, 2000)
 }
 
-function repoRoot(): string {
-  let dir = app.isPackaged ? process.resourcesPath : app.getAppPath()
-  for (let i = 0; i < 6; i++) {
-    if (existsSync(join(dir, 'agent', 'solana-trader'))) return dir
-    dir = resolve(dir, '..')
-  }
-  return resolve(app.getAppPath(), '..')
+// Source files live in the read-only resources bundle (packaged) or repo root (dev).
+function agentSourceDir(name: string): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'agent', name)
+    : join(resolve(app.getAppPath(), '..'), 'agent', name)
+}
+
+// Writable working directory for an agent.
+// Packaged: ~/Library/Application Support/Jarvis/agents/<name> (macOS)
+//           %APPDATA%\Jarvis\agents\<name> (Windows)
+//           ~/.config/Jarvis/agents/<name> (Linux)
+// Dev: <repoRoot>/agent/<name>
+function agentWorkDir(name: string): string {
+  if (!app.isPackaged) return agentSourceDir(name)
+  const workDir = join(app.getPath('userData'), 'agents', name)
+  copyAgentSourceIfNeeded(name, workDir)
+  return workDir
+}
+
+// One-time (per app version) sync of agent source into writable userData dir.
+// Skips .venv / node_modules so installed deps are not clobbered on update.
+function copyAgentSourceIfNeeded(name: string, workDir: string): void {
+  const src = agentSourceDir(name)
+  if (!existsSync(src)) return
+  const stamp = join(workDir, '.jarvis-version')
+  const ver = app.getVersion()
+  try {
+    if (existsSync(stamp) && readFileSync(stamp, 'utf-8').trim() === ver) return
+  } catch { /* force sync on read error */ }
+  mkdirSync(workDir, { recursive: true })
+  cpSync(src, workDir, {
+    recursive: true,
+    filter: (srcPath: string) => {
+      const base = srcPath.split(/[\\/]/).pop() ?? ''
+      return (
+        base !== '.venv' &&
+        base !== 'node_modules' &&
+        base !== '__pycache__' &&
+        !srcPath.endsWith('.pyc')
+      )
+    },
+  })
+  writeFileSync(stamp, ver)
 }
 
 function logsDir(): string {
-  const d = join(repoRoot(), 'logs')
+  // In packaged mode the app bundle is read-only; write logs to userData instead.
+  const base = app.isPackaged ? app.getPath('userData') : resolve(app.getAppPath(), '..')
+  const d = join(base, 'logs')
   try { if (!existsSync(d)) mkdirSync(d, { recursive: true }) } catch { /* ignore */ }
   return d
 }
@@ -121,14 +159,12 @@ export function getStatusSnapshot(): { trader: AgentStatus; strategy: AgentStatu
   }
 }
 
-function attachIO(name: 'solana-trader' | 'solana-strategy' | 'legal-rag', proc: ChildProcess): void {
-  proc.stdout?.on('data', (chunk: Buffer) => pushLog(name, chunk.toString('utf-8')))
-  proc.stderr?.on('data', (chunk: Buffer) => pushLog(name, chunk.toString('utf-8')))
-}
+// On Windows, npm is a .cmd batch file — bare 'npm' fails with shell:false.
+const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
 function spawnTrader(env: NodeJS.ProcessEnv): boolean {
   const a = agents['solana-trader']
-  const cwd = join(repoRoot(), 'agent', 'solana-trader')
+  const cwd = agentWorkDir('solana-trader')
   if (!existsSync(join(cwd, 'node_modules'))) {
     transition('solana-trader', 'not-installed', 'Run: cd agent/solana-trader && npm install')
     return false
@@ -137,7 +173,7 @@ function spawnTrader(env: NodeJS.ProcessEnv): boolean {
   transition('solana-trader', 'spawning', null as unknown as string)
   const out = openSync(a.logPath, 'a')
   const err = openSync(a.logPath, 'a')
-  const proc = spawn('npm', ['run', 'dev'], {
+  const proc = spawn(npmCmd, ['run', 'dev'], {
     cwd,
     env: { ...process.env, ...env, PORT: String(a.port) },
     stdio: ['ignore', out, err],
@@ -146,9 +182,6 @@ function spawnTrader(env: NodeJS.ProcessEnv): boolean {
   a.process = proc
   a.pid = proc.pid ?? null
   a.lastError = null
-  // We stream stdout to file via fd above; for the in-memory tail, also attach pipes:
-  // (re-spawn with 'pipe' if we want both file + pipe; simpler: just append a periodic tail-read.)
-  // For now, surface only spawn errors and exit codes via the events below.
   const startedAt = Date.now()
   proc.on('error', (e) => {
     pushLog('solana-trader', `[spawn error] ${e.message}`)
@@ -174,16 +207,17 @@ function spawnTrader(env: NodeJS.ProcessEnv): boolean {
 }
 
 function pickPython(cwd: string): string {
-  // Prefer the venv created by run_local.sh's setup_venv. System python3 won't
-  // have FastAPI / langchain etc. installed, so we'd crash immediately.
-  const venvPy = join(cwd, '.venv', 'bin', 'python')
+  // Windows venvs use Scripts\python.exe; POSIX venvs use bin/python.
+  const venvPy = process.platform === 'win32'
+    ? join(cwd, '.venv', 'Scripts', 'python.exe')
+    : join(cwd, '.venv', 'bin', 'python')
   if (existsSync(venvPy)) return venvPy
-  return 'python3'
+  return process.platform === 'win32' ? 'python' : 'python3'
 }
 
 function spawnStrategy(env: NodeJS.ProcessEnv): boolean {
   const a = agents['solana-strategy']
-  const cwd = join(repoRoot(), 'agent', 'solana-strategy')
+  const cwd = agentWorkDir('solana-strategy')
   if (!existsSync(join(cwd, 'app', 'server.py'))) {
     transition('solana-strategy', 'crashed', `not found at ${cwd}`)
     return false
@@ -264,7 +298,7 @@ function buildEnv(): NodeJS.ProcessEnv | null {
 
 function spawnLegalRag(env: NodeJS.ProcessEnv): boolean {
   const a = agents['legal-rag']
-  const cwd = join(repoRoot(), 'agent', 'legal-rag')
+  const cwd = agentWorkDir('legal-rag')
   if (!existsSync(join(cwd, 'app', 'server.py'))) {
     transition('legal-rag', 'crashed', `not found at ${cwd}`)
     return false
@@ -373,7 +407,7 @@ export async function restartLegalRag(): Promise<void> {
 // Run `npm install` inside agent/solana-trader; stream output via the
 // provided callback. After successful install, attempt to spawn the trader.
 export async function installTrader(onLog: (line: string) => void): Promise<{ ok: boolean; code: number | null }> {
-  const cwd = join(repoRoot(), 'agent', 'solana-trader')
+  const cwd = agentWorkDir('solana-trader')
   if (!existsSync(cwd)) {
     onLog(`[install] missing dir: ${cwd}`)
     return { ok: false, code: null }
@@ -381,7 +415,7 @@ export async function installTrader(onLog: (line: string) => void): Promise<{ ok
   onLog(`[install] cd ${cwd}`)
   onLog('[install] npm install …')
   return new Promise((resolveP) => {
-    const proc = spawn('npm', ['install'], { cwd, stdio: ['ignore', 'pipe', 'pipe'], shell: false })
+    const proc = spawn(npmCmd, ['install'], { cwd, stdio: ['ignore', 'pipe', 'pipe'], shell: false })
     proc.stdout?.on('data', (d: Buffer) => onLog(d.toString('utf-8').trimEnd()))
     proc.stderr?.on('data', (d: Buffer) => onLog(d.toString('utf-8').trimEnd()))
     proc.on('error', (e) => {
@@ -405,19 +439,20 @@ export async function installTrader(onLog: (line: string) => void): Promise<{ ok
 // Streams output via the callback. After successful install, attempt to spawn
 // the strategy.
 export async function installStrategy(onLog: (line: string) => void): Promise<{ ok: boolean; code: number | null }> {
-  const cwd = join(repoRoot(), 'agent', 'solana-strategy')
+  const cwd = agentWorkDir('solana-strategy')
   if (!existsSync(cwd)) {
     onLog(`[install] missing dir: ${cwd}`)
     return { ok: false, code: null }
   }
   const venv = join(cwd, '.venv')
-  const venvPy = join(venv, 'bin', 'python')
-  const venvPip = join(venv, 'bin', 'pip')
+  const venvPy  = process.platform === 'win32' ? join(venv, 'Scripts', 'python.exe') : join(venv, 'bin', 'python')
+  const venvPip = process.platform === 'win32' ? join(venv, 'Scripts', 'pip.exe')    : join(venv, 'bin', 'pip')
+  const pythonExe = process.platform === 'win32' ? 'python' : 'python3'
   const reqs = join(cwd, 'requirements.txt')
 
   if (!existsSync(venv)) {
     onLog('[install] creating venv …')
-    const created = await runStreamed('python3', ['-m', 'venv', venv], cwd, onLog)
+    const created = await runStreamed(pythonExe, ['-m', 'venv', venv], cwd, onLog)
     if (!created) {
       onLog('[install] venv create failed')
       return { ok: false, code: null }
@@ -468,19 +503,20 @@ function runStreamedExitCode(
 }
 
 export async function installLegalRag(onLog: (line: string) => void): Promise<{ ok: boolean; code: number | null }> {
-  const cwd = join(repoRoot(), 'agent', 'legal-rag')
+  const cwd = agentWorkDir('legal-rag')
   if (!existsSync(cwd)) {
     onLog(`[install] missing dir: ${cwd}`)
     return { ok: false, code: null }
   }
   const venv = join(cwd, '.venv')
-  const venvPy = join(venv, 'bin', 'python')
-  const venvPip = join(venv, 'bin', 'pip')
+  const venvPy  = process.platform === 'win32' ? join(venv, 'Scripts', 'python.exe') : join(venv, 'bin', 'python')
+  const venvPip = process.platform === 'win32' ? join(venv, 'Scripts', 'pip.exe')    : join(venv, 'bin', 'pip')
+  const pythonExe = process.platform === 'win32' ? 'python' : 'python3'
   const reqs = join(cwd, 'requirements.txt')
 
   if (!existsSync(venv)) {
     onLog('[install] creating venv …')
-    const created = await runStreamed('python3', ['-m', 'venv', venv], cwd, onLog)
+    const created = await runStreamed(pythonExe, ['-m', 'venv', venv], cwd, onLog)
     if (!created) {
       onLog('[install] venv create failed')
       return { ok: false, code: null }

@@ -1,4 +1,14 @@
 import { useState } from 'react'
+import jarvisLogo from '../assets/jarvis-logo.svg'
+
+function BrandHeader(): React.JSX.Element {
+  return (
+    <div className="brand-header">
+      <img src={jarvisLogo} alt="" className="brand-header-logo" />
+      <span className="brand-header-title">JARVIS</span>
+    </div>
+  )
+}
 
 type Mode = 'choose' | 'create-pin' | 'show-mnemonic' | 'import-mnemonic' | 'import-base58'
 
@@ -77,6 +87,7 @@ export default function WalletSetup({ onReady }: Props): React.JSX.Element {
   if (mode === 'choose') {
     return (
       <div className="wallet-setup">
+        <BrandHeader />
         <h2 className="wallet-title">SOLANA WALLET</h2>
         <p className="wallet-subtitle">Local keypair · biometric-gated · stored encrypted on this machine</p>
 
@@ -110,6 +121,7 @@ export default function WalletSetup({ onReady }: Props): React.JSX.Element {
   if (mode === 'import-mnemonic') {
     return (
       <div className="wallet-setup">
+        <BrandHeader />
         <h2 className="wallet-title">IMPORT SEED PHRASE</h2>
         <textarea
           className="wallet-textarea"
@@ -136,6 +148,7 @@ export default function WalletSetup({ onReady }: Props): React.JSX.Element {
   if (mode === 'import-base58') {
     return (
       <div className="wallet-setup">
+        <BrandHeader />
         <h2 className="wallet-title">IMPORT PRIVATE KEY</h2>
         <input
           className="wallet-input"
@@ -162,6 +175,7 @@ export default function WalletSetup({ onReady }: Props): React.JSX.Element {
   if (mode === 'create-pin') {
     return (
       <div className="wallet-setup">
+        <BrandHeader />
         <h2 className="wallet-title">SET WALLET PIN</h2>
         <p className="wallet-subtitle">Used to encrypt your keypair on this device. Min 6 chars.</p>
         <input
@@ -194,6 +208,7 @@ export default function WalletSetup({ onReady }: Props): React.JSX.Element {
   if (mode === 'show-mnemonic' && generatedMnemonic) {
     return (
       <div className="wallet-setup">
+        <BrandHeader />
         <h2 className="wallet-title">WRITE THIS DOWN</h2>
         <p className="wallet-subtitle">
           Your seed phrase is the only way to recover this wallet.

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { isBiometricAvailable, verify } from '../lib/biometricAuth'
+import jarvisLogo from '../assets/jarvis-logo.svg'
 
 type State = 'checking' | 'verifying' | 'verified' | 'unavailable' | 'error'
 
@@ -77,38 +78,18 @@ export default function VisualCheck({ onVerified }: { onVerified?: () => void })
 
   return (
     <div className="visual-check">
-      <p
-        className={`status-text ${
-          state === 'verified'
-            ? 'success'
-            : state === 'error'
-              ? 'error'
-              : ''
-        }`}
-      >
-        {statusMsg}
-      </p>
-
-      {(state === 'checking' || state === 'verifying') && (
-        <div className="biometric-icon">
-          <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 10v4" />
-            <path d="M7.5 8a5.5 5.5 0 0 1 9 0" />
-            <path d="M5 6a9 9 0 0 1 14 0" />
-            <path d="M7.5 16a5.5 5.5 0 0 0 9 0" />
-            <path d="M5 18a9 9 0 0 0 14 0" />
-            <circle cx="12" cy="12" r="1" />
-          </svg>
-        </div>
-      )}
-
-      {state === 'verified' && <div className="enrolled-icon">&#x2713;</div>}
-
+      <img src={jarvisLogo} alt="Jarvis" className="welcome-logo" />
+      <h1 className="welcome-title">JARVIS</h1>
+      <p className="welcome-tagline">Your AI Agent</p>
+      <div className="welcome-divider" />
+      <div className="welcome-status">
+        <span className={`status-dot ${state}`} />
+        <p className={`status-text${state === 'verified' ? ' success' : state === 'error' ? ' error' : ''}`}>
+          {statusMsg}
+        </p>
+      </div>
       {state === 'error' && (
-        <>
-          <div className="enrolled-icon error">&#x2717;</div>
-          <button className="retry-btn" onClick={retry}>Retry</button>
-        </>
+        <button className="retry-btn" onClick={retry}>Retry</button>
       )}
     </div>
   )

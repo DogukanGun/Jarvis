@@ -93,6 +93,13 @@ _recovered: bool = False
 # during congestion. See plan §4.3.
 _PANIC_PRIORITY_FEE_SOL = 0.002
 
+# After expires_at fires, the loop enters drain mode and keeps trying to sell
+# for up to DRAIN_GRACE_SEC before giving up unconditionally.
+DRAIN_GRACE_SEC = 300  # 5 minutes
+
+# Guards against spamming the SSE stream with repeated session-lost events.
+_session_lost_notified: bool = False
+
 
 def is_panic() -> bool:
     return _panic_sell
@@ -176,7 +183,7 @@ async def resume_with_new_policy(new_policy_id: str) -> bool:
     """Recover from a session-lost state: swap in a fresh policy id and
     let the runner finish selling stuck positions. Returns True on success.
     """
-    global _session_lost
+    global _session_lost, _session_lost_notified
     if _active_config is None:
         return False
     _active_config.policy_id = new_policy_id
@@ -186,6 +193,7 @@ async def resume_with_new_policy(new_policy_id: str) -> bool:
             p.sell_attempted = False
             p.last_error = None
     _session_lost = False
+    _session_lost_notified = False
     bus.publish("resumed", {
         "policy_id": new_policy_id,
         "stuck_positions": [p.inner.mint for p in _positions.values() if not p.sold],
@@ -297,8 +305,24 @@ async def _loop(cfg: RunnerConfig, stop_event: asyncio.Event) -> None:
     try:
         while not stop_event.is_set():
             if time.time() >= cfg.expires_at:
-                bus.publish("expired", {})
-                break
+                open_positions = [p for p in _positions.values() if not p.sold]
+                if not open_positions:
+                    bus.publish("expired", {})
+                    break
+                # Enter drain mode: keep the loop alive to finish selling.
+                global _no_more_buys, _panic_sell, _panic_reason
+                _no_more_buys = True
+                if not _panic_sell:
+                    _panic_sell = True
+                    _panic_reason = "session expired — draining positions"
+                    bus.publish("panic-mode-entered", {"reason": _panic_reason})
+                # Hard abort once the grace window closes, even if sells are stuck.
+                if time.time() >= cfg.expires_at + DRAIN_GRACE_SEC:
+                    bus.publish("expired", {
+                        "forced": True,
+                        "stuck": [p.inner.mint for p in open_positions],
+                    })
+                    break
             try:
                 if cfg.strategy == "indicator":
                     await _tick_indicator(cfg)
@@ -319,18 +343,27 @@ async def _loop(cfg: RunnerConfig, stop_event: asyncio.Event) -> None:
                 store.clear()
                 break
 
-            # Fatal exit: the Electron loopback rejected a sign with 403.
-            # In panic mode, we keep retrying — the user may resume mid-flight
-            # and we don't want to bail with positions still on-chain. Outside
-            # panic, treat 403 as terminal so we don't burn fees forever.
+            # Session-lost: the Electron loopback rejected a sign with 403.
+            # If there are no open positions, exit cleanly. If positions are
+            # still live, keep the loop alive so resume_with_new_policy() can
+            # unblock selling — breaking here would make that call unreachable.
             if _session_lost and not _panic_sell:
                 stuck = [p.inner.mint for p in _positions.values() if not p.sold]
-                bus.publish("session-lost", {
-                    "reason": "loopback returned 403 'no active session'",
-                    "stuck_positions": stuck,
-                    "advice": "re-authorize via the Auto-Trade tab to resume selling",
-                })
-                break
+                if not stuck:
+                    bus.publish("session-lost", {
+                        "reason": "loopback returned 403 'no active session'",
+                        "stuck_positions": [],
+                    })
+                    break
+                global _session_lost_notified
+                if not _session_lost_notified:
+                    bus.publish("session-lost", {
+                        "reason": "loopback returned 403 'no active session'",
+                        "stuck_positions": stuck,
+                        "advice": "re-authorize via the Auto-Trade tab to resume selling",
+                    })
+                    _session_lost_notified = True
+                # Keep looping — sells will resume once resume_with_new_policy() fires.
 
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=cfg.interval_sec)
@@ -568,7 +601,12 @@ async def _process_exits(cfg: RunnerConfig) -> None:
             try:
                 current_price = await get_spot_price(mint)
             except PriceUnavailable as e:
-                logger.debug("price fetch for %s failed: %s", mint, e)
+                logger.warning("price fetch for %s failed, falling back to time-only exit: %s", mint, e)
+                bus.publish("warn", {
+                    "mint": mint,
+                    "phase": "price-fetch",
+                    "message": f"TP/SL disabled this tick (price unavailable): {e}",
+                })
                 current_price = None
 
         # `should_exit` needs *some* price to short-circuit TP/SL checks
@@ -582,6 +620,13 @@ async def _process_exits(cfg: RunnerConfig) -> None:
         else:
             should, reason = tracked.inner.should_exit(decision_price)
         if not should:
+            logger.debug(
+                "position %s: no exit (price=%.8f tp=%.8f sl=%.8f hold=%s)",
+                mint, decision_price,
+                tracked.inner.take_profit_price or 0.0,
+                tracked.inner.stop_loss_price or 0.0,
+                tracked.inner.max_hold_time,
+            )
             continue
 
         tracked.sell_attempted = True

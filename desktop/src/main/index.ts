@@ -4,6 +4,8 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerWalletIpc } from './wallet/ipc'
 
+app.setName('Jarvis')
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 960,
@@ -36,6 +38,7 @@ function createWindow(): void {
 
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.jarvis')
+  app.setAboutPanelOptions({ applicationName: 'Jarvis', applicationVersion: '1.0.0' })
 
   // Grant camera permission to the renderer without a browser prompt
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
