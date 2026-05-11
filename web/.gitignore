@@ -1,0 +1,14 @@
+# Next.js
+.next/
+out/
+node_modules/
+
+# Large binary installers — built by web/scripts/prepare-downloads.sh
+# Commit these only if you self-host; otherwise let next.config.mjs
+# fall back to GitHub Releases.
+public/downloads/*.dmg
+public/downloads/*.exe
+public/downloads/*.AppImage
+public/downloads/*.deb
+public/downloads/*.zip
+public/downloads/*.tar.gz

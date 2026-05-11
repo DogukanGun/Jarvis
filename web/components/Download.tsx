@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Monitor, Terminal, Apple } from 'lucide-react'
 
-const BASE = 'https://github.com/DogukanGun/Jarvis/releases/latest/download'
+// Files are served from /public/downloads/ (built by web/scripts/prepare-downloads.sh).
+// If a file is absent Next.js falls back to the GitHub Releases rewrite in next.config.mjs.
+const DL = '/downloads'
 
 const platforms = [
   {
@@ -12,7 +14,10 @@ const platforms = [
     label: 'macOS',
     icon: Apple,
     description: 'macOS 12 Monterey or later',
-    downloads: [{ label: 'Download .dmg', url: `${BASE}/Jarvis-1.0.0.dmg` }],
+    downloads: [
+      { label: 'Download .dmg  (Apple Silicon)', url: `${DL}/Jarvis-1.0.0.dmg` },
+      { label: 'Download .zip  (Apple Silicon)', url: `${DL}/Jarvis-1.0.0-arm64-mac.zip` },
+    ],
     detect: (ua: string) => /mac/i.test(ua) && !/iphone|ipad/i.test(ua),
   },
   {
@@ -20,7 +25,7 @@ const platforms = [
     label: 'Windows',
     icon: Monitor,
     description: 'Windows 10 / 11 (64-bit)',
-    downloads: [{ label: 'Download .exe', url: `${BASE}/Jarvis-1.0.0-setup.exe` }],
+    downloads: [{ label: 'Download .exe', url: `${DL}/Jarvis-1.0.0-setup.exe` }],
     detect: (ua: string) => /win/i.test(ua),
   },
   {
@@ -29,8 +34,8 @@ const platforms = [
     icon: Terminal,
     description: 'Ubuntu, Debian, and compatible',
     downloads: [
-      { label: 'Download .AppImage', url: `${BASE}/Jarvis-1.0.0.AppImage` },
-      { label: 'Download .deb', url: `${BASE}/Jarvis-1.0.0.deb` },
+      { label: 'Download .AppImage', url: `${DL}/Jarvis-1.0.0.AppImage` },
+      { label: 'Download .deb', url: `${DL}/Jarvis-1.0.0.deb` },
     ],
     detect: (ua: string) => /linux/i.test(ua),
   },
@@ -105,6 +110,7 @@ export default function Download() {
                     <a
                       key={dlLabel}
                       href={url}
+                      download
                       className={`w-full py-3 px-4 rounded-xl text-sm font-semibold text-center transition-all ${
                         active
                           ? 'bg-[#4ade80] text-[#0a0a0a] hover:bg-[#4ade80]/90 hover:shadow-[0_0_24px_rgba(74,222,128,0.35)]'
