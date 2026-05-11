@@ -20,39 +20,11 @@ The timing is specific. Three things converged: local inference became viable (O
 
 ## What technologies are you using or integrating with?
 
-**Desktop & UI**
-- Electron 39 + React 19 + TypeScript — native cross-platform app (macOS, Windows, Linux)
-- Next.js 14 + Framer Motion — landing page, deployed on Vercel
+The desktop app is built with Electron, React 19, and TypeScript. The landing page uses Next.js 14 with Framer Motion for animations, deployed on Vercel. The backend is a mesh of ten microservices written in Python (Flask, FastAPI) and Node.js (Fastify), connected by Apache Kafka for real-time async event streaming between agents.
 
-**Agent Mesh — 10 specialised microservices**
-- Python + Flask / FastAPI — Router (central orchestrator), Strategy engine,
-  Legal RAG, Thinker research pipeline, Vision, Swiss Army Knife, Memory worker
-- Node.js + Fastify — Solana Trader agent
-- Apache Kafka — async event bus; the Router forwards agent lifecycle events
-  to the desktop in real time over WebSocket
+On the Solana side we integrate Solana Web3.js, SPL Token, and Solana Agent Kit v2 for on-chain execution, Jupiter for swap aggregation, and Pump.fun for token launches. Transaction signing runs through an isolated loopback HTTP server inside the Electron main process so private keys never touch the network.
 
-**Solana & DeFi**
-- Solana Web3.js + SPL Token — wallet, signing, token transfers
-- Solana Agent Kit v2 — high-level on-chain actions
-- Jupiter — token swap aggregation
-- Pump.fun — token launch
-- Loopback signer — a private HTTP server inside the Electron main process;
-  agents request transaction signatures via bearer-token auth so private keys
-  are never exposed to the network
+For AI we run Ollama locally for LLM inference with no cloud dependency, OpenAI Whisper for voice input, YOLOv8 for real-time object detection in guard mode, and a custom RAG pipeline for legal document Q&A. Mem0 handles semantic memory across sessions. Claude Code was used as the primary AI coding assistant throughout development.
 
-**AI & Inference**
-- Ollama — local LLM inference, no cloud required
-- OpenAI Whisper — speech-to-text for voice input
-- YOLOv8 — real-time object detection for guard mode camera surveillance
-- RAG pipeline — PDF/text ingestion, vector search, LLM synthesis for the
-  legal document agent
-- Mem0 — semantic memory layer across sessions
+Infrastructure is Docker Compose running Kafka, Zookeeper, MinIO, and Ollama. Auth uses macOS Touch ID via Electron's native biometric API, AES-256 encrypted wallet vaults, and BIP39/Ed25519 key derivation.
 
-**Security & Auth**
-- macOS Touch ID / Face ID via Electron's native biometric API
-- AES-256 encrypted wallet vault, PIN-protected, bcrypt-hashed
-- BIP39 mnemonic derivation, Ed25519 HD keys
-
-**Infrastructure**
-- Docker Compose — Kafka, Zookeeper, MinIO, Ollama
-- MinIO — S3-compatible artifact and memory blob storage
